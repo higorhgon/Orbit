@@ -8,8 +8,8 @@ A homebrew launcher for modded Xbox 360 consoles. Orbit puts your original Xbox 
 
 Orbit is in development (v0.9). So far it has been tested on one console: an Xbox 360 S (Trinity) running BadUpdate.
 
-- **Working:** original Xbox games, installed Xbox 360 games (Games on Demand), apps, FILES, box art.
-- **Not tested yet:** Arcade games.
+- **Working:** original Xbox games, installed Xbox 360 games (Games on Demand), Arcade games, apps, FILES, box art.
+- **Not tested yet:** extracted Xbox 360 games (game folders with a `default.xex`, rather than installed packages).
 - **Not supported yet:** launching game discs.
 
 If something doesn't work on your setup, please [open an issue](../../issues).
@@ -66,9 +66,9 @@ Depth is how many folder levels Orbit looks down from the path. It stops going d
 
 | What you're adding | Example layout | Depth |
 |---|---|---|
-| A folder of extracted 360 games | `Usb0:\Games\Halo 3\default.xex` | **2** |
+| A folder of extracted 360 games (not tested yet) | `Usb0:\Games\<Game>\default.xex` | **2** |
 | A folder of original Xbox games | `Hdd1:\Xbox\Halo\default.xbe` | **2** |
-| A folder of apps (it must be named **Apps**) | `Usb0:\Apps\Aurora\Aurora.xex` | **2** |
+| A folder of apps (it must be named **Apps**) | `Usb0:\Apps\Simple 360 NAND Flasher\default.xex` | **2** |
 | Installed games, Arcade and Games on Demand | `Hdd1:\Content\0000000000000000\<TitleID>\…` | **3** |
 | The same, including games installed under a profile | `Hdd1:\Content` | **4** |
 
