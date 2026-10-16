@@ -19,7 +19,7 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 - **Main menu:** a ring of six items: XBOX, XBOX 360, ARCADE, APPS, FILES, SETTINGS.
 - **Shelves:** 3D game cases (black for original Xbox, green for 360, orange for Arcade) with your box art. Games without art get a cover drawn for them.
   - **A** launch, **X** back cover, **Y** details (title, version, size, delete).
-- **Launching:** loose `.xex` / `.xbe` files, installed 360 games (Games on Demand packages) and original Xbox games.
+- **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
 - **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste and delete. System folders are protected.
 - **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan.
 - **Sorting:** items go on the right shelf by what they are, not by which folder they're in.
@@ -40,35 +40,43 @@ If your console is already modded and you use Aurora, you can try Orbit without 
 
 Orbit doesn't change your console's settings or Aurora's. Pressing Xbox Home takes you back to Aurora as usual, and to remove Orbit you just delete its folder.
 
+## Before you start: mod your console
+
+New to modding? Your console first needs to run homebrew with Dashlaunch, using one of these:
+
+- **Softmods** (no opening the console):
+  - [BadUpdate](https://github.com/grimdoomer/Xbox360BadUpdate): a software-only exploit.
+  - ABadAvatar: a software exploit used the same way as BadUpdate.
+  - [Peer Pressure](https://github.com/grimdoomer/Xbox360PeerPressure): a persistent softmod.
+- **Hardware mods:** RGH (Reset Glitch Hack) or JTAG. These need the console opened and modified; if you already have one, Dashlaunch is usually set up with it.
+
+With BadUpdate or ABadAvatar, use [XeUnshackle Max](https://github.com/klofi/XeUnshackle-Max) as the payload. It applies the patches and loads Dashlaunch, which is what lets Orbit become your dashboard.
+
+Video tutorials by MrMario2011:
+- [Peer Pressure beginner setup](https://youtu.be/G8ceM_xXlO8)
+- [XeUnshackle Max for BadUpdate or ABadAvatar](https://youtu.be/P2hOdoLzQ38)
+- [Updating BadUpdate to 1.3](https://youtu.be/zADjXH8SFmI)
+
+**These guides set up Aurora as the dashboard.** Wherever they use Aurora, such as copying it to your drive or pointing `Default =` at it in `launch.ini`, use Orbit instead (see [Install](#install-new-users-or-making-orbit-your-dashboard)). You can still install Aurora alongside Orbit as a backup, on a button you hold at boot.
+
 ## Install (new users, or making Orbit your dashboard)
 
-1. Get your console running homebrew with Dashlaunch first, using one of these:
-   - **Softmods** (no opening the console):
-     - [BadUpdate](https://github.com/grimdoomer/Xbox360BadUpdate): a software-only exploit.
-     - ABadAvatar: a software exploit used the same way as BadUpdate.
-     - [Peer Pressure](https://github.com/grimdoomer/Xbox360PeerPressure): a persistent softmod.
-   - **Hardware mods:** RGH (Reset Glitch Hack) or JTAG. These need the console opened and modified; if you already have one, Dashlaunch is usually set up with it.
-
-   With BadUpdate or ABadAvatar, use [XeUnshackle Max](https://github.com/klofi/XeUnshackle-Max) as the payload. It applies the patches and loads Dashlaunch, which is what lets Orbit become your dashboard.
-
-   Video tutorials by MrMario2011:
-   - [Peer Pressure beginner setup](https://youtu.be/G8ceM_xXlO8)
-   - [XeUnshackle Max for BadUpdate or ABadAvatar](https://youtu.be/P2hOdoLzQ38)
-   - [Updating BadUpdate to 1.3](https://youtu.be/zADjXH8SFmI)
-
-   **These guides set up Aurora as the dashboard.** Wherever they use Aurora, such as copying it to your drive or pointing `Default =` at it in `launch.ini`, use Orbit instead (steps 2–4 below). You can still install Aurora alongside Orbit as a backup, on a button you hold at boot (step 4).
-2. Download the latest zip from [Releases](../../releases) and unzip it.
-3. Copy the `Orbit` folder (with `Orbit.xex` and `Media` inside) to your drive, for example `Usb0:\Apps\Orbit`.
-4. To boot straight into Orbit, set it as the default in Dashlaunch's `launch.ini`:
+1. Download the latest zip from [Releases](../../releases) and unzip it.
+2. Copy the `Orbit` folder (with `Orbit.xex` and `Media` inside) to your drive, for example `Usb0:\Apps\Orbit`.
+3. To boot straight into Orbit, set it as the default in Dashlaunch's `launch.ini`. Dashlaunch calls the USB drive `Usb:` and the internal drive `Hdd:`:
    ```ini
    Default = Usb:\Apps\Orbit\Orbit.xex
+   ```
+   or, if you put Orbit on the internal drive:
+   ```ini
+   Default = Hdd:\Apps\Orbit\Orbit.xex
    ```
    If you have another dashboard such as Aurora, keep a button pointing at it so you can still reach it by holding that button at boot:
    ```ini
    LBump = Usb:\Apps\Aurora\Aurora.xex
    ```
    Use a button you don't press in menus, such as LB or RB, not A or B. Dashlaunch also checks held buttons when you go back to Xbox Home, so if Aurora is on A, choosing Xbox Home with A opens Aurora instead of Orbit.
-5. Start the console, open **SETTINGS** in Orbit, add your content paths and **SCAN NOW**.
+4. Start the console, open **SETTINGS** in Orbit, add your content paths (see [Setting up your content paths](#setting-up-your-content-paths)) and **SCAN NOW**.
 
 If Orbit ever fails to start, it tries to open Aurora from `Usb0:\Apps\Aurora\Aurora.xex`, then the dashboard. Holding Y at boot (if your `launch.ini` points Y at the stock dashboard) is another way back.
 
@@ -129,7 +137,13 @@ Orbit keeps its paths in `paths.txt` and the last scan in `library.txt`, next to
 
 ## Box art
 
-Put covers in `Usb0:\Orbit\Covers\`, named by title ID, for example `4D5307E6.jpg` for Halo 3. Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
+Box art is optional; games without it get a cover drawn for them.
+
+1. Create a folder called `Orbit`, with a `Covers` folder inside it, in the **root of your USB drive**: `Usb0:\Orbit\Covers\`. Orbit doesn't create it for you, and it only looks on the USB drive for now.
+2. Put covers in it named by title ID, for example `4D5307E6.jpg` for Halo 3. A game's title ID is shown in its content folder name (`Content\0000000000000000\<TitleID>`) or on xboxunity.net.
+3. Run **SCAN NOW** in SETTINGS, or restart Orbit, to load them.
+
+Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
 
 ## Title updates and DLC
 
@@ -153,7 +167,7 @@ MSBuild OrbitTest.sln /p:Configuration=Release "/p:Platform=Xbox 360"
 
 The shaders in `OrbitTest\Shaders` compile automatically before each build (`BuildShaders.cmd`).
 
-The menu art in `Media\` is generated from `Tools\bake.html`. Run `node Tools/bake.js` to bake it; this uses Microsoft Edge in headless mode. `orbit-prototype.html` is the browser prototype the console version was built from.
+The menu art in `Media\` is generated from `Tools\bake.html`. Run `node Tools/bake.js` to bake it; this uses Google Chrome or Microsoft Edge (whichever is installed) in headless mode. `orbit-prototype.html` is the browser prototype the console version was built from.
 
 ## Credits
 
