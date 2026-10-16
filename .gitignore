@@ -1,0 +1,33 @@
+# Visual Studio
+*.sdf
+*.opensdf
+*.suo
+*.user
+ipch/
+Debug/
+Release/
+OrbitTest/Debug/
+OrbitTest/Release/
+
+# Compiled shaders (BuildShaders.cmd makes these before every build)
+OrbitTest/Shaders/*PS.h
+OrbitTest/Shaders/*VS.h
+
+# Built files: shipped on the Releases page instead
+Builds/
+Media/
+*.xex
+
+# Personal or third-party files that must never be uploaded
+Backups/
+Tools/cover_candidates/
+*.bin
+ConsoleInfo.txt
+launch.ini
+
+# Visual Studio wizard boilerplate
+OrbitTest/ReadMe.txt
+
+# Personal helper tools (kept locally, not shared)
+Tools/covers.py
+Tools/preview.js

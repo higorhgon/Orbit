@@ -1,0 +1,1060 @@
+<title>Orbit</title>
+<!-- Orbit, an Xbox 360 homebrew launcher. Copyright (c) 2026 Noah Colbourne.
+     Licensed under the GNU General Public License v3.0 or later; see LICENSE. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Michroma&family=Orbitron:wght@900&display=swap">
+<style>
+/* Layout: full-bleed WebGL scene, thin HUD strip pinned to the bottom, boot overlay on top */
+:root {
+  --void: #07010e;
+  --plum: #0b0214;
+  --ion: #b98aff;
+  --ion-dim: #9c84c9;
+  --haze: rgba(185, 138, 255, 0.08);
+  --pod-edge: #cc33ff;
+  --pod-core: #b300ff;
+  --pod-deep: #4a0080;
+  --pod-ink: #1a0033;
+  --pod-glow: #df80ff;
+  --font-display: 'Michroma', 'Eurostile', 'Arial Narrow', sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, 'Courier New', monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--plum);
+  color: var(--ion);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* stage: the launcher's screen. The transform makes its fixed-position children (HUD, Files,
+   CRT glass) lay out inside it, so letterboxing to 16:9 or 4:3 frames the whole UI */
+#stage { position: fixed; left: 50%; top: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); overflow: hidden; background: var(--plum); }
+body.boxed { background: #000; }
+.view { position: fixed; z-index: 20; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  padding: 6px 12px; background: rgba(26, 0, 51, 0.7); border: 1px solid var(--pod-edge); color: #f2c8ff;
+  font: 11px var(--font-mono); letter-spacing: 0.2em; cursor: pointer;
+  box-shadow: 0 0 8px rgba(204, 51, 255, 0.5);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+.view:focus-visible { outline: 1px solid var(--pod-glow); outline-offset: 3px; }
+#scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; image-rendering: pixelated; }
+/* CRT glass over everything (scene + HUD): fine scanlines, rolling flicker band, dark corners */
+.crt { position: fixed; inset: 0; pointer-events: none; z-index: 10;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px); }
+.crt::after { content: ""; position: absolute; left: 0; right: 0; height: 18%; top: -18%;
+  background: linear-gradient(180deg, transparent, rgba(185, 138, 255, 0.04), transparent);
+  animation: roll 7s linear infinite; }
+@keyframes roll { to { top: 100%; } }
+
+.hud {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--ion-dim);
+  pointer-events: none;
+}
+.hud .now { color: var(--ion); font-family: var(--font-display); font-size: 11px; letter-spacing: 0.3em; }
+.hud .keys { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+
+.top {
+  position: fixed; left: 0; right: 0; top: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) 0;
+  display: flex; justify-content: space-between;
+  font-size: 11px; letter-spacing: 0.25em; color: var(--ion-dim);
+  pointer-events: none;
+}
+.top b { font-family: var(--font-display); font-weight: 400; color: var(--ion); }
+
+.nav {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 64px;
+  background: var(--haze); border: 1px solid var(--ion-dim); color: var(--ion);
+  font: 18px var(--font-mono); cursor: pointer;
+  clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%);
+}
+.nav:focus-visible, .boot:focus-visible { outline: 1px solid var(--ion); outline-offset: 3px; }
+#prev { left: max(10px, env(safe-area-inset-left, 0px)); }
+#next { right: max(10px, env(safe-area-inset-right, 0px)); }
+
+.boot {
+  position: fixed; inset: 0;
+  display: grid; place-items: center; align-content: center; gap: 18px;
+  background: radial-gradient(ellipse at center, rgba(7, 1, 14, 0.35), var(--void) 85%);
+  color: var(--ion);
+  border: 0; cursor: pointer; width: 100%;
+  font-family: var(--font-mono);
+  z-index: 5;
+}
+.boot .mark { font-family: var(--font-display); font-size: clamp(22px, 5vw, 40px); letter-spacing: 0.5em; padding-left: 0.5em; }
+.boot .cta { font-size: 13px; letter-spacing: 0.4em; color: var(--ion-dim); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.toast {
+  position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
+  font-family: var(--font-display); font-size: 12px; letter-spacing: 0.4em;
+  color: var(--ion); opacity: 0; transition: opacity .25s; pointer-events: none;
+  white-space: nowrap;
+}
+.toast.on { opacity: 1; }
+
+/* Xbox library: title card above the case row */
+.gameinfo { position: fixed; left: 0; right: 0; top: calc(11% + env(safe-area-inset-top, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; }
+.gameinfo .gt { font-family: 'Orbitron', var(--font-display); font-weight: 900; font-size: clamp(15px, 2.6vw, 24px); letter-spacing: 0.08em;
+  color: #f6e6ff; -webkit-text-stroke: 1px var(--pod-edge); text-shadow: 0 0 8px var(--pod-edge), 0 0 18px rgba(179, 0, 255, 0.6); text-wrap: balance; }
+.gameinfo .gs { font-size: 12px; letter-spacing: 0.25em; color: #d9b8ff; text-shadow: 0 0 6px rgba(160, 102, 255, 0.7); font-variant-numeric: tabular-nums; }
+
+.hud .keys span { display: inline-flex; align-items: center; }
+/* neon oval buttons: translucent core, bright rim, layered inner and outer glow */
+.btn { display: inline-grid; place-items: center; width: 40px; height: 30px; margin-right: 10px; border-radius: 50%; background: rgba(185, 138, 255, 0.15); border: 2px solid #d2adff; box-shadow: 0 0 6px #a066ff, 0 0 14px #a066ff, inset 0 0 6px #a066ff, inset 0 0 12px #3a0f80; font-style: normal; font-family: var(--font-display); font-size: 14px; letter-spacing: 0; color: #f0e4ff; text-shadow: 0 0 3px #ffffff, 0 0 8px #a066ff, 0 0 14px #a066ff; }
+.hud .keys span { color: #cdb3ff; text-shadow: 0 0 6px rgba(160, 102, 255, 0.7); }
+/* mini pods for A and B: same liquid capsule, rim and glow as the BACK pod, sized for the HUD */
+.pod { --cut: polygon(20% 0, 70% 0, 100% 18%, 100% 72%, 78% 100%, 28% 100%, 0 77%, 0 23%);
+  position: relative; display: inline-grid; place-items: center; width: 46px; height: 34px; margin-right: 12px;
+  transform: rotate(-8deg); font-style: normal;
+  filter: drop-shadow(0 0 4px rgba(204, 51, 255, 0.8)) drop-shadow(0 0 9px rgba(179, 0, 255, 0.45)); }
+.pod::before, .pod::after { content: ""; position: absolute; }
+/* purple fill sits slightly down-right; the thick frame is a separate layer on top of it */
+.pod::after { inset: 1px; z-index: 0; clip-path: var(--cut); background: radial-gradient(circle at 35% 35%, var(--pod-core) 0%, var(--pod-deep) 60%, var(--pod-ink) 100%); }
+.pod::before { inset: 0; z-index: 1;
+  clip-path: polygon(evenodd, 20% 0, 70% 0, 100% 18%, 100% 72%, 78% 100%, 28% 100%, 0 77%, 0 23%, 20% 0, 22.8% 11.8%, 8.7% 26.5%, 8.7% 72%, 30.4% 88.2%, 73.9% 88.2%, 91.3% 66.2%, 91.3% 25%, 67.4% 11.8%, 22.8% 11.8%);
+  background: linear-gradient(160deg, #f2c8ff 0%, var(--pod-edge) 45%, #6a1aa8 100%); }
+.pod b { position: relative; z-index: 2; font-family: 'Orbitron', 'Impact', 'Arial Black', sans-serif; font-weight: 900; font-size: 17px; letter-spacing: 0; line-height: 1; display: block; text-align: center; width: 100%; color: var(--pod-ink); -webkit-text-stroke: 1.5px var(--pod-glow); text-shadow: 0 0 4px var(--pod-edge); transform: rotate(8deg); }
+
+/* Back button: asymmetrical purple pod + stretched label, scaled into the corner */
+.back-cluster {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  display: flex; flex-direction: column; align-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  transform: scale(0.5); transform-origin: bottom left;
+  -webkit-tap-highlight-color: transparent;
+}
+.purple-pod-btn {
+  position: relative;
+  width: 180px; height: 130px;
+  border-radius: 40% 60% 45% 55% / 50% 40% 60% 50%;
+  border: 4px solid var(--pod-edge);
+  background: radial-gradient(circle at 35% 35%, var(--pod-core) 0%, var(--pod-deep) 60%, var(--pod-ink) 100%);
+  box-shadow:
+    0 0 25px rgba(204, 51, 255, 0.7),
+    0 0 50px rgba(179, 0, 255, 0.4),
+    inset 0 0 20px rgba(255, 255, 255, 0.3);
+  display: flex; justify-content: center; align-items: center;
+  transform: rotate(-12deg);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.retro-letter {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 4.5rem; font-weight: 900;
+  color: var(--pod-ink);
+  transform: rotate(12deg);
+  letter-spacing: -2px;
+  -webkit-text-stroke: 4px var(--pod-glow);
+  text-shadow: 0 0 10px var(--pod-edge);
+}
+.retro-label-text {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 3.5rem;
+  color: var(--pod-glow);
+  margin-top: 15px;
+  letter-spacing: 2px;
+  transform: scaleY(1.3) skewX(-4deg);
+  text-shadow: 0 0 12px rgba(204, 51, 255, 0.8);
+}
+.back-cluster:hover .purple-pod-btn { box-shadow: 0 0 35px rgba(204, 51, 255, 0.9), 0 0 70px rgba(179, 0, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.35); }
+.back-cluster.pressed .purple-pod-btn, .back-cluster:active .purple-pod-btn { transform: rotate(-12deg) scale(0.92); }
+.back-cluster:focus-visible { outline: 2px solid var(--pod-glow); outline-offset: 6px; }
+
+/* Files window: thick bevelled pod frame around a plum panel, sized in --u like the rest of the HUD */
+.term { position: fixed; inset: 0; display: grid; place-items: center; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: calc(34px * var(--u) + env(safe-area-inset-top, 0px)) calc(44px * var(--u) + env(safe-area-inset-bottom, 0px)); background: rgba(10, 0, 22, 0.55); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.winwrap { width: min(calc(640px * var(--u)), 100%); height: min(calc(340px * var(--u)), 100%); filter: drop-shadow(0 0 calc(8px * var(--u)) rgba(204, 51, 255, 0.75)) drop-shadow(0 0 calc(20px * var(--u)) rgba(179, 0, 255, 0.4)); }
+.win { --c: calc(18px * var(--u)); position: relative; width: 100%; height: 100%; padding: calc(5px * var(--u)); box-sizing: border-box;
+  background: linear-gradient(160deg, #f2c8ff 0%, var(--pod-edge) 40%, #6a1aa8 100%);
+  clip-path: polygon(var(--c) 0, calc(100% - var(--c) * 1.6) 0, 100% calc(var(--c) * 0.9), 100% calc(100% - var(--c)), calc(100% - var(--c) * 1.2) 100%, calc(var(--c) * 1.4) 100%, 0 calc(100% - var(--c) * 0.9), 0 var(--c));
+  font-family: var(--font-mono); color: var(--ion); }
+.wpanel { --c2: calc(15px * var(--u)); position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  background: radial-gradient(circle at 30% 20%, #3a0870 0%, #22054a 45%, #12022a 100%);
+  box-shadow: inset 0 0 calc(14px * var(--u)) rgba(204, 51, 255, 0.35);
+  clip-path: polygon(var(--c2) 0, calc(100% - var(--c2) * 1.6) 0, 100% calc(var(--c2) * 0.9), 100% calc(100% - var(--c2)), calc(100% - var(--c2) * 1.2) 100%, calc(var(--c2) * 1.4) 100%, 0 calc(100% - var(--c2) * 0.9), 0 var(--c2)); }
+.wpanel::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(223, 128, 255, 0.05) 0 1px, transparent 1px 3px); }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: calc(7px * var(--u)) calc(14px * var(--u)); background: linear-gradient(90deg, rgba(179, 0, 255, 0.35), rgba(74, 0, 128, 0.2)); border-bottom: calc(2px * var(--u)) solid var(--pod-edge); font-size: calc(9px * var(--u)); letter-spacing: 0.2em; color: #d9b8ff; }
+.bar b { font-family: 'Orbitron', var(--font-display); font-weight: 900; letter-spacing: 0.12em; color: #f6e6ff; text-shadow: 0 0 6px var(--pod-edge); }
+.fbody { display: flex; flex: 1; min-height: 0; }
+.devs { width: calc(118px * var(--u)); flex: none; border-right: calc(1px * var(--u)) solid rgba(204, 51, 255, 0.4); padding: calc(9px * var(--u)); display: flex; flex-direction: column; gap: calc(6px * var(--u)); font-size: calc(9px * var(--u)); letter-spacing: 0.08em; }
+.dev { --cd: calc(7px * var(--u)); display: flex; flex-direction: column; gap: calc(3px * var(--u)); padding: calc(6px * var(--u)) calc(8px * var(--u)); color: #a98fd6;
+  clip-path: polygon(var(--cd) 0, 100% 0, 100% calc(100% - var(--cd)), calc(100% - var(--cd)) 100%, 0 100%, 0 var(--cd)); }
+.dev > span:first-child { font-family: 'Orbitron', var(--font-display); font-weight: 900; font-size: calc(10px * var(--u)); letter-spacing: 0.1em; }
+.dev.on { color: #fbefff; background: radial-gradient(circle at 30% 30%, var(--pod-core) 0%, var(--pod-deep) 70%, var(--pod-ink) 100%); box-shadow: inset 0 0 0 calc(2px * var(--u)) var(--pod-edge), inset 0 0 calc(8px * var(--u)) rgba(255, 255, 255, 0.25); }
+.dev.on > span:first-child { text-shadow: 0 0 6px var(--pod-glow); }
+.meter { font-size: calc(8px * var(--u)); letter-spacing: 0; }
+.list { flex: 1; min-width: 0; overflow-y: auto; margin: 0; padding: calc(6px * var(--u)); list-style: none; display: flex; flex-direction: column; gap: calc(2px * var(--u)); }
+.row { --cr: calc(6px * var(--u)); display: grid; grid-template-columns: calc(34px * var(--u)) minmax(0, 1fr) calc(54px * var(--u)); gap: calc(8px * var(--u)); align-items: center; padding: calc(4px * var(--u)) calc(10px * var(--u)); font-size: calc(10.5px * var(--u)); color: #d9c8f5; cursor: pointer;
+  clip-path: polygon(var(--cr) 0, 100% 0, 100% calc(100% - var(--cr)), calc(100% - var(--cr)) 100%, 0 100%, 0 var(--cr)); }
+.row .t { color: #a98fd6; font-size: calc(8px * var(--u)); letter-spacing: 0.15em; }
+.row .n { overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.row .s { text-align: right; color: #a98fd6; font-variant-numeric: tabular-nums; }
+.row.on { color: #ffffff; background: linear-gradient(90deg, var(--pod-core) 0%, var(--pod-deep) 65%, rgba(74, 0, 128, 0.35) 100%); box-shadow: inset 0 0 0 calc(1.5px * var(--u)) var(--pod-edge); text-shadow: 0 0 6px var(--pod-glow); }
+.row.on .t, .row.on .s { color: #f2c8ff; }
+.prompt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: calc(4px * var(--u)) calc(12px * var(--u)); padding: calc(7px * var(--u)) calc(14px * var(--u)); border-top: calc(2px * var(--u)) solid var(--pod-edge); background: rgba(26, 0, 51, 0.6); font-size: calc(9px * var(--u)); color: #d9b8ff; }
+.cur { display: inline-block; width: calc(6px * var(--u)); height: calc(10px * var(--u)); margin-left: 4px; vertical-align: middle; background: var(--pod-glow); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (max-width: 620px) {
+  .devs { display: none; }
+}
+
+/* HUD scales with the screen's height (--u = 1 at 480 lines), the way console UI is laid out
+   for a fixed TV resolution, so buttons and labels stay in proportion with the 3D at any size */
+#stage { --u: 1; }
+.top { font-size: calc(9px * var(--u)); padding-block: calc(12px * var(--u) + env(safe-area-inset-top, 0px)) 0; }
+.hud { font-size: calc(9px * var(--u)); padding-block: calc(8px * var(--u)) calc(12px * var(--u) + env(safe-area-inset-bottom, 0px)); }
+.hud .now { font-size: calc(9px * var(--u)); }
+.hud .keys { gap: calc(14px * var(--u)); }
+.pod { width: calc(30px * var(--u)); height: calc(22px * var(--u)); margin-right: calc(7px * var(--u)); }
+.pod b { font-size: calc(11px * var(--u)); -webkit-text-stroke-width: calc(1px * var(--u)); }
+.gameinfo .gt { font-size: calc(18px * var(--u)); }
+.gameinfo .gs { font-size: calc(9px * var(--u)); }
+.toast { font-size: calc(10px * var(--u)); }
+@media (max-width: 520px) {
+  .hud .keys .opt { display: none; }
+  .back-cluster { transform: scale(0.38); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot .cta, .cur, .crt::after { animation: none; }
+}
+</style>
+
+<button class="view" id="view" aria-label="Switch screen shape">VIEW: FULL</button>
+<div id="stage">
+<canvas id="scene" aria-label="Launcher scene with a glowing core and a rotating menu ring"></canvas>
+
+<div class="top"><span><b>ORBIT</b>&nbsp; LAUNCHER</span><span id="clock">--:--</span></div>
+<div class="toast" id="toast">OPENING</div>
+<div class="gameinfo" id="gameinfo" hidden><span class="gt" id="gtitle"></span><span class="gs" id="gsub"></span></div>
+<section class="term" id="files" hidden aria-label="File explorer">
+  <div class="winwrap"><div class="win"><div class="wpanel">
+    <div class="bar"><span><b>ORBIT</b> // FILES</span><span id="fpath">HDD1:\</span></div>
+    <div class="fbody">
+      <div class="devs" id="devs"></div>
+      <ul class="list" id="flist"></ul>
+    </div>
+    <div class="prompt"><span>COPY default.xex → USB0:\Games\ [██████░░░░] 62%</span><span>orbit@hdd1:~$<i class="cur"></i></span></div>
+  </div></div></div>
+</section>
+<div class="hud">
+  <span class="now" id="now"></span>
+  <span class="keys" id="keys"></span>
+</div>
+<div class="crt" aria-hidden="true"></div>
+<button class="boot" id="boot"><span class="mark">ORBIT</span><span class="cta">PRESS TO START</span></button>
+
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+const ITEMS = ['Xbox', 'Xbox 360', 'Arcade', 'Files', 'Settings'];
+const COLOR = new THREE.Color('#b98aff');
+const RADIUS = 3.5; // widened a bit so the bigger orb has room inside the ring
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- renderer / scene ---------- */
+const canvas = document.getElementById('scene');
+// early-2000s look: no antialiasing, rendered at ~480 lines and scaled up with hard pixels
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+const LINES = 480;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x4a0080, 6, 13);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+
+// purple backdrop: deep violet field, magenta haze band at the horizon, a big glow behind
+// the orb with faint concentric halo rings; drawn at render resolution so it shares the retro pixels
+function makeBackground(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, w); c.height = Math.max(1, h);
+  const x = c.getContext('2d');
+  const cx = w * 0.5, cy = h * 0.46, m = Math.max(w, h);
+
+  // same recipe as the pods and menu items: #b300ff core -> #4a0080 -> #1a0033, centered on the orb
+  const v = x.createRadialGradient(cx, cy, 0, cx, cy, m * 0.75);
+  v.addColorStop(0, '#b300ff');
+  v.addColorStop(0.45, '#4a0080');
+  v.addColorStop(1, '#1a0033');
+  x.fillStyle = v; x.fillRect(0, 0, w, h);
+
+  // horizon haze band in the pod rim colour, where the ring sits
+  const hz = x.createLinearGradient(0, h * 0.5, 0, h * 0.75);
+  hz.addColorStop(0, 'rgba(204, 51, 255, 0)');
+  hz.addColorStop(0.5, 'rgba(204, 51, 255, 0.14)');
+  hz.addColorStop(1, 'rgba(204, 51, 255, 0)');
+  x.fillStyle = hz; x.fillRect(0, h * 0.5, w, h * 0.25);
+
+  // faint halo rings radiating out from the orb
+  x.lineWidth = 1;
+  for (let i = 1; i <= 9; i++) {
+    const r = m * 0.07 * i * (1 + i * 0.06);
+    x.strokeStyle = `rgba(204, 51, 255, ${0.16 - i * 0.014})`;
+    x.beginPath(); x.ellipse(cx, cy, r, r * 0.92, 0, 0, Math.PI * 2); x.stroke();
+  }
+
+  // dark edges so the purple pools in the middle
+  const vg = x.createRadialGradient(cx, cy, m * 0.3, cx, cy, m * 0.75);
+  vg.addColorStop(0, 'rgba(5, 0, 12, 0)');
+  vg.addColorStop(1, 'rgba(5, 0, 12, 0.25)');
+  x.fillStyle = vg; x.fillRect(0, 0, w, h);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  return tex;
+}
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 1.0, 0.45, 0.45);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// period video pass: slight RGB fringing, 16-bit-ish color banding with ordered dither, grain
+const retro = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uTime: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime; varying vec2 vUv;
+    float bayer(vec2 p){
+      int x = int(mod(p.x, 4.0)), y = int(mod(p.y, 4.0)); int i = x + y * 4;
+      float m[16] = float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
+      for (int k = 0; k < 16; k++) if (k == i) return m[k] / 16.0;
+      return 0.0;
+    }
+    void main(){
+      vec2 px = 1.0 / uRes;
+      vec3 c;
+      c.r = texture2D(tDiffuse, vUv + vec2(px.x * 1.2, 0.0)).r;
+      c.g = texture2D(tDiffuse, vUv).g;
+      c.b = texture2D(tDiffuse, vUv - vec2(px.x * 1.2, 0.0)).b;
+      float grain = fract(sin(dot(vUv * uRes + uTime * 61.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+      c += grain * 0.035;
+      // RGB565-style banding: 32 red/blue levels, 64 green, dithered
+      vec3 lv = vec3(31.0, 63.0, 31.0);
+      float d = bayer(gl_FragCoord.xy) - 0.5;
+      c = floor(c * lv + 0.5 + d) / lv;
+      gl_FragColor = vec4(c, 1.0);
+    }`
+});
+composer.addPass(retro);
+
+/* ---------- starfield ---------- */
+{
+  const n = 1400, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const r = 18 + Math.random() * 22, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pos.set([r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xa995d6, size: 0.06, fog: false, transparent: true, opacity: 0.6 })));
+}
+
+/* ---------- core ---------- */
+// Simplex noise from webgl-noise, Copyright (C) 2011 Ashima Arts (Ian McEwan), MIT License
+// (https://github.com/ashima/webgl-noise). Full notice in OrbitTest/Shaders/Noise.hlsli.
+const noise = `
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy; i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}`;
+const uniforms = { uTime: { value: 0 }, uPulse: { value: 0 }, uColor: { value: COLOR } };
+const coreMat = new THREE.ShaderMaterial({
+  uniforms,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `
+    uniform float uTime; uniform float uPulse;
+    varying float vDisp; varying vec3 vNormal; varying vec3 vView;
+    ${noise}
+    void main(){
+      float n = snoise(position*1.2 + uTime*0.35)*0.22 + snoise(position*3.5 - uTime*0.6)*0.06;
+      n *= 1.0 + uPulse*1.5; vDisp = n;
+      vec4 mv = modelViewMatrix * vec4(position + normal*n, 1.0);
+      vNormal = normalize(normalMatrix*normal); vView = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform vec3 uColor; uniform float uPulse;
+    varying float vDisp; varying vec3 vNormal; varying vec3 vView;
+    void main(){
+      float rim = pow(1.0 - max(dot(vNormal, vView), 0.0), 2.2);
+      float core = 0.25 + vDisp*1.8;
+      // facing term: brightest where the surface points at the camera, so the middle glows hot
+      float face = pow(max(dot(vNormal, vView), 0.0), 3.0);
+      vec3 col = uColor*(core + rim*1.6 + uPulse*0.8) + vec3(0.45, 0.12, 0.85) * face * uPulse * 0.6;
+      // thin out the shell where it faces the camera so the dark body shows solid in the middle
+      col *= mix(1.0, 0.3, face);
+      gl_FragColor = vec4(col, 0.55 + rim*0.45);
+    }`
+});
+// lower tessellation so the blob shows chunky period-correct facets
+const coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 18), coreMat);
+coreMesh.scale.setScalar(1.5);
+scene.add(coreMesh);
+// dark purple body inside the blob: blocks the bright backdrop so the orb has a solid middle,
+// drawn first so the glowing additive shell sits on top of it
+const nucleus = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1, 6),
+  new THREE.MeshBasicMaterial({ color: 0x2a0058, fog: false })
+);
+nucleus.renderOrder = -1;
+nucleus.scale.setScalar(1.2);
+scene.add(nucleus);
+
+/* ---------- menu ring ---------- */
+// panel face = the A/B pod stretched sideways: same lopsided capsule ends, plum core,
+// bright rim with layered glow, dark Impact letters with a glowing lilac outline
+function podPath(x, x0, y0, w, h, inset = 0) {
+  // chamfered panel: each corner cut at a different angle so it keeps the lopsided pod feel;
+  // cut sizes are in pod pixels (pod is 130 tall) and scale with height so only the middle stretches
+  const k = h / 130;
+  const tl = [36 * k, 30 * k], tr = [54 * k, 24 * k], br = [40 * k, 36 * k], bl = [50 * k, 30 * k];
+  const X0 = x0 + inset, Y0 = y0 + inset, X1 = x0 + w - inset, Y1 = y0 + h - inset;
+  const q = inset * 0.4; // shrink cuts a touch on inner outlines so the bevel stays parallel
+  x.beginPath();
+  x.moveTo(X0 + tl[0] - q, Y0);
+  x.lineTo(X1 - tr[0] + q, Y0);
+  x.lineTo(X1, Y0 + tr[1] - q);
+  x.lineTo(X1, Y1 - br[1] + q);
+  x.lineTo(X1 - br[0] + q, Y1);
+  x.lineTo(X0 + bl[0] - q, Y1);
+  x.lineTo(X0, Y1 - bl[1] + q);
+  x.lineTo(X0, Y0 + tl[1] - q);
+  x.closePath();
+}
+function labelTexture(text) {
+  const W = 1200, H = 400, pw = 1080, ph = 280;
+  const k = ph / 130; // pod px -> canvas px
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const x0 = (W - pw) / 2, y0 = (H - ph) / 2;
+
+  // shape gets the pod's slight tilt, letters stay level
+  x.save();
+  x.translate(W / 2, H / 2); x.rotate(-2 * Math.PI / 180); x.translate(-W / 2, -H / 2);
+
+  // outer glow layers (box-shadow 0 0 25px / 0 0 50px)
+  podPath(x, x0, y0, pw, ph);
+  x.fillStyle = '#4a0080';
+  x.shadowColor = 'rgba(179, 0, 255, 0.4)'; x.shadowBlur = 50 * k * 0.5; x.fill();
+  x.shadowColor = 'rgba(204, 51, 255, 0.7)'; x.shadowBlur = 25 * k * 0.5; x.fill();
+  x.shadowBlur = 0;
+
+  // core: radial-gradient(circle at 35% 35%, #b300ff, #4a0080 60%, #1a0033)
+  const g = x.createRadialGradient(x0 + pw * 0.35, y0 + ph * 0.35, 0, x0 + pw * 0.35, y0 + ph * 0.35, pw * 0.75);
+  g.addColorStop(0, '#b300ff'); g.addColorStop(0.6, '#4a0080'); g.addColorStop(1, '#1a0033');
+  podPath(x, x0, y0, pw, ph);
+  x.fillStyle = g; x.fill();
+
+  // inset white glow (inset 0 0 20px rgba(255,255,255,.3))
+  x.save(); podPath(x, x0, y0, pw, ph); x.clip();
+  x.shadowColor = 'rgba(255, 255, 255, 0.6)'; x.shadowBlur = 20 * k;
+  x.lineWidth = 6 * k; x.strokeStyle = 'rgba(255, 255, 255, 0.3)'; x.stroke();
+  x.restore();
+
+  // frame: a thick bevelled border laid over the purple like a separate moulded piece,
+  // nudged up-left so the fill peeks out under it, with its own drop shadow
+  const off = -5 * k;
+  const fg = x.createLinearGradient(x0, y0, x0 + pw * 0.4, y0 + ph);
+  fg.addColorStop(0, '#f2c8ff'); fg.addColorStop(0.45, '#cc33ff'); fg.addColorStop(1, '#6a1aa8');
+  x.save();
+  x.shadowColor = 'rgba(10, 0, 25, 0.85)'; x.shadowBlur = 6 * k; x.shadowOffsetX = 3 * k; x.shadowOffsetY = 4 * k;
+  podPath(x, x0 + off, y0 + off, pw, ph, 6 * k);
+  x.lineWidth = 12 * k; x.lineJoin = 'miter'; x.strokeStyle = fg; x.stroke();
+  x.restore();
+  // glow off the frame
+  x.save();
+  x.shadowColor = 'rgba(204, 51, 255, 0.9)'; x.shadowBlur = 14 * k;
+  podPath(x, x0 + off, y0 + off, pw, ph, 6 * k);
+  x.lineWidth = 12 * k; x.strokeStyle = fg; x.stroke();
+  x.restore();
+  // highlight on the frame's outer edge and a dark line on its inner edge sell the bevel
+  podPath(x, x0 + off, y0 + off, pw, ph, 0.5 * k);
+  x.lineWidth = 1.4 * k; x.strokeStyle = 'rgba(255, 240, 255, 0.55)'; x.stroke();
+  podPath(x, x0 + off, y0 + off, pw, ph, 11.5 * k);
+  x.lineWidth = 1.4 * k; x.strokeStyle = 'rgba(20, 0, 40, 0.6)'; x.stroke();
+  x.restore();
+
+  // letters: Orbitron Black, ink core, lilac stroke, glow; shrink to fit the pod's straight middle
+  const label = text.toUpperCase();
+  const fam = 'Orbitron, Impact, "Arial Black", sans-serif';
+  if ('letterSpacing' in x) x.letterSpacing = '2px';
+  let size = 120;
+  x.font = `900 ${size}px ${fam}`;
+  const maxW = pw * 0.78;
+  const mw = x.measureText(label).width;
+  if (mw > maxW) { size = Math.floor(size * maxW / mw); x.font = `900 ${size}px ${fam}`; }
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineJoin = 'round';
+  x.shadowColor = '#cc33ff'; x.shadowBlur = 10 * k;
+  x.lineWidth = 4 * k * 2; x.strokeStyle = '#df80ff';
+  x.strokeText(label, W / 2, H / 2 + 6);
+  x.shadowBlur = 0;
+  x.fillStyle = '#1a0033';
+  x.fillText(label, W / 2, H / 2 + 6);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+const ring = new THREE.Group();
+ring.position.y = -0.2;
+scene.add(ring);
+const step = (Math.PI * 2) / ITEMS.length;
+const panels = ITEMS.map((label, i) => {
+  const a = i * step;
+  const g = new THREE.Group();
+  g.position.set(Math.sin(a) * RADIUS, 0, Math.cos(a) * RADIUS);
+  g.rotation.y = a;
+  const box = new THREE.BoxGeometry(1.8, 0.6, 0.12);
+  // invisible hit box for tapping; the pod texture is the visible panel
+  const fill = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ visible: false }));
+  const text = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.0, 0.667),
+    new THREE.MeshBasicMaterial({ map: labelTexture(label), transparent: true, depthWrite: false })
+  );
+  text.position.z = 0.07;
+  fill.userData.index = i;
+  g.add(fill, text);
+  ring.add(g);
+  return { g, fill, text, label };
+});
+const track = new THREE.Mesh(
+  new THREE.RingGeometry(RADIUS - 0.02, RADIUS + 0.02, 128),
+  new THREE.MeshBasicMaterial({ color: COLOR, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+);
+track.rotation.x = -Math.PI / 2;
+track.position.y = -0.45;
+ring.add(track);
+
+/* ---------- Xbox library: light-3D game cases ---------- */
+// cover art is generated (title + gradient), not copied from real boxes
+const GAMES = [
+  { t: 'Halo: Combat Evolved', y: 2001, g: 'Shooter', hue: 265 },
+  { t: 'Jet Set Radio Future', y: 2002, g: 'Action', hue: 300 },
+  { t: 'Star Wars: Knights of the Old Republic', y: 2003, g: 'RPG', hue: 235 },
+  { t: 'Ninja Gaiden Black', y: 2005, g: 'Action', hue: 320 },
+  { t: 'Fable', y: 2004, g: 'RPG', hue: 280 },
+  { t: 'Psychonauts', y: 2005, g: 'Platformer', hue: 290 },
+  { t: 'Crimson Skies', y: 2003, g: 'Flight', hue: 250 },
+  { t: 'Panzer Dragoon Orta', y: 2002, g: 'Rail Shooter', hue: 275 },
+  { t: 'Project Gotham Racing 2', y: 2003, g: 'Racing', hue: 310 },
+  { t: 'MechAssault', y: 2002, g: 'Action', hue: 255 },
+];
+const CASE_W = 0.95, CASE_H = 1.34, CASE_D = 0.12;
+
+function wrapLines(x, text, maxW) {
+  const words = text.toUpperCase().split(' '), lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (x.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function coverTexture(game, i) {
+  const W = 512, H = 722;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const h = game.hue;
+  const g = x.createLinearGradient(0, 0, W * 0.4, H);
+  g.addColorStop(0, `hsl(${h} 95% 52%)`); g.addColorStop(0.55, `hsl(${h + 10} 85% 24%)`); g.addColorStop(1, `hsl(${h + 20} 90% 9%)`);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // abstract art: a few concentric chamfer frames and a burst, unique per game
+  x.save(); x.translate(W / 2, H * 0.58);
+  for (let k = 0; k < 6; k++) {
+    const r = 40 + k * 38 + (i % 3) * 6;
+    x.strokeStyle = `hsla(${h + 30} 100% 75% / ${0.35 - k * 0.05})`; x.lineWidth = 3;
+    x.rotate(0.12 + i * 0.07);
+    x.strokeRect(-r, -r * 0.7, r * 2, r * 1.4);
+  }
+  x.restore();
+  const rg = x.createRadialGradient(W / 2, H * 0.58, 0, W / 2, H * 0.58, 220);
+  rg.addColorStop(0, `hsla(${h + 40} 100% 85% / 0.55)`); rg.addColorStop(1, 'hsla(0 0% 0% / 0)');
+  x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  // top band
+  x.fillStyle = 'rgba(15, 0, 30, 0.85)'; x.fillRect(0, 0, W, 64);
+  x.fillStyle = '#cc33ff'; x.fillRect(0, 62, W, 4);
+  x.font = '900 26px Orbitron, Impact, sans-serif'; x.textBaseline = 'middle';
+  if ('letterSpacing' in x) x.letterSpacing = '6px';
+  x.fillStyle = '#e9c8ff'; x.fillText('ORBIT', 22, 33);
+  x.font = '22px "Share Tech Mono", monospace'; x.textAlign = 'right';
+  x.fillText(String(game.y), W - 22, 34);
+  // title
+  x.textAlign = 'center'; if ('letterSpacing' in x) x.letterSpacing = '1px';
+  let size = 54; x.font = `900 ${size}px Orbitron, Impact, sans-serif`;
+  let lines = wrapLines(x, game.t, W - 70);
+  while (lines.length > 3 && size > 30) { size -= 4; x.font = `900 ${size}px Orbitron, Impact, sans-serif`; lines = wrapLines(x, game.t, W - 70); }
+  x.lineJoin = 'round';
+  lines.forEach((ln, k) => {
+    const yy = 130 + k * size * 1.12;
+    x.lineWidth = 8; x.strokeStyle = 'rgba(20, 0, 40, 0.9)'; x.strokeText(ln, W / 2, yy);
+    x.shadowColor = '#cc33ff'; x.shadowBlur = 14; x.fillStyle = '#fbefff'; x.fillText(ln, W / 2, yy); x.shadowBlur = 0;
+  });
+  // bottom strip
+  x.fillStyle = 'rgba(15, 0, 30, 0.75)'; x.fillRect(0, H - 52, W, 52);
+  x.font = '20px "Share Tech Mono", monospace'; x.fillStyle = '#d9b8ff';
+  if ('letterSpacing' in x) x.letterSpacing = '4px';
+  x.fillText(game.g.toUpperCase(), W / 2, H - 26);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function spineTexture(game) {
+  const W = 64, H = 722;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  x.fillStyle = `hsl(${game.hue} 70% 14%)`; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#cc33ff'; x.fillRect(0, 0, W, 6); x.fillRect(0, H - 6, W, 6);
+  x.save(); x.translate(W / 2, H / 2); x.rotate(-Math.PI / 2);
+  x.font = '900 24px Orbitron, Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = '#efd9ff';
+  let label = game.t.toUpperCase();
+  while (x.measureText(label).width > H - 40 && label.length > 4) label = label.slice(0, -2);
+  x.fillText(label, 0, 0);
+  x.restore();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const library = new THREE.Group();
+library.position.set(0, 0.3, 2.2);
+library.scale.setScalar(0.001);
+library.visible = false;
+scene.add(library);
+const caseGeo = new THREE.BoxGeometry(CASE_W, CASE_H, CASE_D);
+const caseEdges = new THREE.EdgesGeometry(caseGeo);
+const cases = GAMES.map((game, i) => {
+  const plastic = new THREE.MeshBasicMaterial({ color: new THREE.Color(`hsl(${game.hue}, 55%, 10%)`), fog: false });
+  const edgeTone = new THREE.MeshBasicMaterial({ color: new THREE.Color(`hsl(${game.hue}, 60%, 20%)`), fog: false });
+  const front = new THREE.MeshBasicMaterial({ map: coverTexture(game, i), fog: false });
+  const spine = new THREE.MeshBasicMaterial({ map: spineTexture(game), fog: false });
+  // box face order: +x, -x, +y, -y, +z (front), -z (back)
+  const mesh = new THREE.Mesh(caseGeo, [edgeTone, spine, edgeTone, plastic, front, plastic]);
+  mesh.userData.gi = i;
+  const rim = new THREE.LineSegments(caseEdges, new THREE.LineBasicMaterial({ color: 0xcc33ff, transparent: true, opacity: 0.3, fog: false }));
+  const holder = new THREE.Group();
+  holder.add(mesh, rim);
+  library.add(holder);
+  return { holder, mesh, rim, front, spine, game, i };
+});
+let xboxOpen = false, gi = 0, orbK = 1;
+const infoEl = document.getElementById('gameinfo');
+const gTitle = document.getElementById('gtitle'), gSub = document.getElementById('gsub');
+function renderGameInfo() {
+  const gm = GAMES[gi];
+  gTitle.textContent = gm.t.toUpperCase();
+  gSub.textContent = `${gm.g.toUpperCase()} · ${gm.y} · ${gi + 1} / ${GAMES.length}`;
+}
+
+/* ---------- audio ---------- */
+const audio = {
+  ctx: null, master: null,
+  start() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = this.ctx = new AC();
+    this.master = ctx.createGain(); this.master.gain.value = 0.6; this.master.connect(ctx.destination);
+    const out = ctx.createGain(); out.gain.value = 0; out.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 3);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    [55, 55.4, 110.2].forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = i === 2 ? 'sine' : 'sawtooth'; o.frequency.value = f; o.connect(lp); o.start();
+    });
+    const lfo = ctx.createOscillator(), lg = ctx.createGain();
+    lfo.frequency.value = 0.08; lg.gain.value = 180; lfo.connect(lg).connect(lp.frequency); lfo.start();
+    lp.connect(out).connect(this.master);
+  },
+  blip(freq, dur = 0.12, type = 'triangle', vol = 0.15, slide = 1) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * slide, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + dur + 0.02);
+  },
+  trigger(name) {
+    if (name === 'move') this.blip(660, 0.08, 'triangle', 0.1, 1.2);
+    if (name === 'select') { this.blip(440, 0.18, 'sine', 0.18, 2); setTimeout(() => this.blip(880, 0.25, 'sine', 0.12, 1.5), 60); }
+    if (name === 'back') this.blip(520, 0.15, 'triangle', 0.12, 0.5);
+  }
+};
+
+/* ---------- state + input ---------- */
+let index = 0, pulse = 0, booted = false;
+const nowEl = document.getElementById('now');
+const toast = document.getElementById('toast');
+let toastTimer;
+
+/* ---------- file explorer ---------- */
+const keysEl = document.getElementById('keys');
+const filesEl = document.getElementById('files');
+const listEl = document.getElementById('flist');
+const devsEl = document.getElementById('devs');
+const pathEl = document.getElementById('fpath');
+const POD_A = '<i class="pod"><b>A</b></i>', POD_B = '<i class="pod"><b>B</b></i>';
+const POD_X = '<i class="pod"><b>X</b></i>', POD_Y = '<i class="pod"><b>Y</b></i>';
+const KEYS_MAIN = '<span>◀ ▶ MOVE</span><span>' + POD_A + 'SELECT</span><span>' + POD_B + 'BACK</span>';
+const KEYS_XBOX = '<span>◀ ▶ BROWSE</span><span>' + POD_A + 'LAUNCH</span><span>' + POD_B + 'BACK</span>';
+const KEYS_FILES = '<span>' + POD_A + 'OPEN</span><span class="opt">' + POD_X + 'DELETE</span><span class="opt">' + POD_Y + 'COPY / MOVE</span><span>' + POD_B + 'BACK</span>';
+keysEl.innerHTML = KEYS_MAIN;
+const DEVICES = [
+  { n: 'HDD1', free: '212 GB FREE', used: 58, path: 'HDD1:\\' },
+  { n: 'USB0', free: '41 GB FREE', used: 84, path: 'USB0:\\' },
+  { n: 'DVD', free: 'NO DISC', used: 0, path: 'DVD:\\' }
+];
+const FILES = [
+  ['DIR', '..', ''], ['DIR', 'Xbox', '—'], ['DIR', 'Xbox 360', '—'], ['DIR', 'Arcade', '—'],
+  ['DIR', 'Content', '—'], ['DIR', 'Art', '128 MB'], ['FILE', 'launch.ini', '2 KB'], ['FILE', 'notes.txt', '1 KB']
+];
+let filesOpen = false, dev = 0, row = 0;
+const meter = (p) => { const n = Math.round(p / 10); return '[' + '█'.repeat(n) + '░'.repeat(10 - n) + '] ' + p + '%'; };
+const curFiles = () => DEVICES[dev].n === 'DVD' ? [['---', 'NO DISC', '']] : FILES;
+function renderFiles() {
+  devsEl.innerHTML = DEVICES.map((d, i) => `<div class="dev${i === dev ? ' on' : ''}"><span>${d.n}</span><span class="meter">${meter(d.used)}</span><span class="meter">${d.free}</span></div>`).join('');
+  pathEl.textContent = DEVICES[dev].path;
+  listEl.innerHTML = curFiles().map((f, i) => `<li class="row${i === row ? ' on' : ''}" data-i="${i}"><span class="t">${f[0]}</span><span class="n">${i === row ? '> ' : '  '}${f[1]}</span><span class="s">${f[2]}</span></li>`).join('');
+  listEl.children[row]?.scrollIntoView({ block: 'nearest' });
+}
+function openFiles() {
+  filesOpen = true; dev = 0; row = 0;
+  filesEl.hidden = false;
+  nowEl.textContent = 'FILES';
+  keysEl.innerHTML = KEYS_FILES;
+  renderFiles();
+}
+function closeFiles() {
+  filesOpen = false;
+  filesEl.hidden = true;
+  nowEl.textContent = ''; // only named while inside a menu item
+  keysEl.innerHTML = KEYS_MAIN;
+ 
+  audio.trigger('back');
+}
+function openRow() {
+  const f = curFiles()[row];
+  if (!f || f[0] === '---') return;
+  audio.trigger('select');
+  toast.textContent = 'OPEN ' + f[1].toUpperCase();
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('on'), 900);
+}
+function filesKey(k, e) {
+  const n = curFiles().length;
+  if (k === 'ArrowUp' || k === 'ArrowDown') { e?.preventDefault(); row = (row + (k === 'ArrowUp' ? -1 : 1) + n) % n; audio.trigger('move'); renderFiles(); }
+  else if (k === 'ArrowLeft') move(-1);
+  else if (k === 'ArrowRight') move(1);
+  else if (k === 'Enter' || k === ' ') { e?.preventDefault(); openRow(); }
+  else if (k === 'Escape' || k === 'Backspace' || k.toLowerCase() === 'b') { e?.preventDefault(); back(); }
+}
+listEl.addEventListener('click', (e) => {
+  const li = e.target.closest('.row');
+  if (!li) return;
+  const i = Number(li.dataset.i);
+  if (i === row) openRow(); else { row = i; audio.trigger('move'); renderFiles(); }
+});
+
+function openXbox() {
+  xboxOpen = true;
+  library.visible = true;
+  infoEl.hidden = false;
+  nowEl.textContent = 'XBOX';
+  keysEl.innerHTML = KEYS_XBOX;
+  renderGameInfo();
+}
+function closeXbox() {
+  xboxOpen = false;
+  infoEl.hidden = true;
+  nowEl.textContent = '';
+  keysEl.innerHTML = KEYS_MAIN;
+  audio.trigger('back');
+}
+function launchGame() {
+  pulse = 1;
+  audio.trigger('select');
+  toast.textContent = 'LAUNCHING ' + GAMES[gi].t.toUpperCase();
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('on'), 1400);
+}
+
+function move(dir) {
+  if (xboxOpen) {
+    const ng = Math.min(GAMES.length - 1, Math.max(0, gi + dir));
+    if (ng !== gi) { gi = ng; audio.trigger('move'); renderGameInfo(); }
+    return;
+  }
+  if (filesOpen) {
+    dev = (dev + dir + DEVICES.length) % DEVICES.length; row = 0;
+    audio.trigger('move'); renderFiles();
+    return;
+  }
+  index = (index + dir + ITEMS.length) % ITEMS.length;
+ 
+  audio.trigger('move');
+}
+function select(i) {
+  if (i !== undefined && i !== index) { index = i; audio.trigger('move'); return; }
+  pulse = 1;
+  audio.trigger('select');
+  toast.textContent = 'OPENING ' + ITEMS[index].toUpperCase();
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('on'), 1100);
+  if (ITEMS[index] === 'Files') setTimeout(openFiles, 350);
+  if (ITEMS[index] === 'Xbox') setTimeout(openXbox, 250);
+}
+
+// one back action for keyboard and gamepad: closes Files if open
+function back() {
+  if (filesOpen) closeFiles();
+  else if (xboxOpen) closeXbox();
+  else audio.trigger('back');
+}
+
+document.getElementById('boot').addEventListener('click', (e) => {
+  audio.start();
+  booted = true;
+  e.currentTarget.hidden = true;
+});
+
+addEventListener('keydown', (e) => {
+  if (!booted) return;
+  if (filesOpen) { filesKey(e.key, e); return; }
+  if (xboxOpen && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); launchGame(); return; }
+  if (e.key === 'ArrowLeft') move(-1);
+  else if (e.key === 'ArrowRight') move(1);
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); }
+  else if (e.key === 'Escape' || e.key === 'Backspace' || e.key.toLowerCase() === 'b') back();
+});
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downX = null;
+canvas.addEventListener('pointerdown', (e) => { downX = e.clientX; });
+canvas.addEventListener('pointerup', (e) => {
+  if (downX === null) return;
+  const dx = e.clientX - downX; downX = null;
+  if (Math.abs(dx) > 40) { move(dx < 0 ? 1 : -1); return; }
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  if (xboxOpen) {
+    const h = ray.intersectObjects(cases.map(c => c.mesh))[0];
+    if (h) { const i = h.object.userData.gi; if (i === gi) launchGame(); else { gi = i; audio.trigger('move'); renderGameInfo(); } }
+    return;
+  }
+  const hit = ray.intersectObjects(panels.map(p => p.fill))[0];
+  if (hit) select(hit.object.userData.index);
+});
+
+let lastPad = 0, prevA = false, prevB = false;
+function pollPad(t) {
+  const pad = navigator.getGamepads?.()[0];
+  if (!pad || !booted) return;
+  const x = pad.axes[0] ?? 0, y = pad.axes[1] ?? 0;
+  const left = pad.buttons[14]?.pressed || x < -0.5, right = pad.buttons[15]?.pressed || x > 0.5;
+  const up = pad.buttons[12]?.pressed || y < -0.5, down = pad.buttons[13]?.pressed || y > 0.5;
+  if (t - lastPad > 200) {
+    if (left || right) { move(left ? -1 : 1); lastPad = t; }
+    else if (filesOpen && (up || down)) { filesKey(up ? 'ArrowUp' : 'ArrowDown'); lastPad = t; }
+  }
+  const a = pad.buttons[0]?.pressed, b = pad.buttons[1]?.pressed;
+  if (a && !prevA) { if (filesOpen) openRow(); else if (xboxOpen) launchGame(); else select(); }
+  if (b && !prevB) back();
+  prevA = a; prevB = b;
+}
+
+/* ---------- resize ---------- */
+let camDist = 6.5, camDistLib = 6.5, camZNow = 6.5;
+// view switcher: FULL fills the screen, 16:9 and 4:3 letterbox the stage to that shape
+const stage = document.getElementById('stage');
+const viewBtn = document.getElementById('view');
+const MODES = [['FULL', 0], ['16:9', 16 / 9], ['4:3', 4 / 3]];
+let mode = 0;
+try { mode = Math.max(0, MODES.findIndex(m => m[0] === localStorage.getItem('orbit-view'))); } catch {}
+function layoutStage() {
+  const W = innerWidth, H = innerHeight, r = MODES[mode][1];
+  let w = W, h = H;
+  if (r) { if (W / H > r) { w = Math.round(H * r); } else { h = Math.round(W / r); } }
+  stage.style.width = w + 'px'; stage.style.height = h + 'px';
+  stage.style.setProperty('--u', Math.min(1.8, Math.max(0.6, h / 480)).toFixed(3));
+  document.body.classList.toggle('boxed', !!r);
+  viewBtn.textContent = 'VIEW: ' + MODES[mode][0];
+  return [w, h];
+}
+viewBtn.addEventListener('click', () => {
+  mode = (mode + 1) % MODES.length;
+  try { localStorage.setItem('orbit-view', MODES[mode][0]); } catch {}
+  audio.trigger('move');
+  resize();
+});
+function resize() {
+  const [w, h] = layoutStage();
+  const pr = Math.min(1, LINES / h);
+  renderer.setPixelRatio(pr);
+  renderer.setSize(w, h, false);
+  composer.setPixelRatio(pr);
+  composer.setSize(w, h);
+  retro.uniforms.uRes.value.set(Math.round(w * pr), Math.round(h * pr));
+  camera.aspect = w / h;
+  camera.fov = w / h < 0.8 ? 75 : 50;
+  camera.updateProjectionMatrix();
+  // landscape: keep the whole ring in frame horizontally. 16:9 stays at the default distance;
+  // narrower screens like 4:3 pull the camera back just enough that the side panels clear the edges
+  if (w / h < 0.8) { camDist = 8.5; camDistLib = 8.5; }
+  else {
+    const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+    // ring + half a selected panel + margin; never closer than 8.2 so the front panel clears the bottom bar
+    camDist = Math.max(8.2, (RADIUS + 1.9) / tanH);
+    // the game row only needs the front case and its neighbours in frame, so 4:3 can stay close
+    camDistLib = Math.max(6.5, 2.6 / tanH);
+  }
+  scene.background?.dispose?.();
+  scene.background = makeBackground(Math.round(w * pr), Math.round(h * pr));
+}
+addEventListener('resize', resize);
+resize();
+
+/* ---------- clock ---------- */
+const clockEl = document.getElementById('clock');
+function tick() { clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+tick(); setInterval(tick, 15000);
+
+/* ---------- loop ---------- */
+const clock = new THREE.Clock();
+function frame(t) {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const speed = reduceMotion ? 0.3 : 1;
+  uniforms.uTime.value += dt * speed;
+  retro.uniforms.uTime.value = reduceMotion ? 0 : clock.elapsedTime;
+  pulse = Math.max(0, pulse - dt * 2.5);
+  uniforms.uPulse.value = pulse;
+  // nucleus breathes slowly and swells on select
+  nucleus.scale.setScalar((1.2 + Math.sin(uniforms.uTime.value * 1.3) * 0.03 + pulse * 0.08) * orbK);
+
+  const target = -index * step;
+  const cur = ring.rotation.y;
+  const diff = Math.atan2(Math.sin(target - cur), Math.cos(target - cur));
+  ring.rotation.y = cur + diff * (1 - Math.exp(-6 * dt));
+
+  // Xbox library: ring tucks away, orb floats up, cases fan out in a light cover-flow
+  const ringS = THREE.MathUtils.damp(ring.scale.x, xboxOpen ? 0.001 : 1, 7, dt);
+  ring.scale.setScalar(ringS); ring.visible = ringS > 0.01;
+  const libS = THREE.MathUtils.damp(library.scale.x, xboxOpen ? 1 : 0.001, 7, dt);
+  library.scale.setScalar(libS); library.visible = libS > 0.01;
+  // orb rises and shrinks a little so it hovers above the cases instead of behind them
+  const orbY = THREE.MathUtils.damp(coreMesh.position.y, xboxOpen ? 0.6 : 0, 5, dt);
+  coreMesh.position.y = orbY; nucleus.position.y = orbY;
+  orbK = THREE.MathUtils.damp(orbK, 1, 5, dt); // orb keeps full size; the cases sit in front of it
+  coreMesh.scale.setScalar(1.5 * orbK);
+  if (library.visible) {
+    const sway = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.8) * 0.12;
+    cases.forEach((cs) => {
+      const d = cs.i - gi, ad = Math.abs(d), sg = Math.sign(d);
+      const tx = d === 0 ? 0 : sg * (0.95 + (ad - 1) * 0.5);
+      const tz = d === 0 ? 0.55 : -0.15 - ad * 0.08;
+      const ry = d === 0 ? sway : -sg * 0.95;
+      const ts = d === 0 ? 1.18 : 0.92;
+      const hd = cs.holder;
+      hd.position.x = THREE.MathUtils.damp(hd.position.x, tx, 9, dt);
+      hd.position.z = THREE.MathUtils.damp(hd.position.z, tz, 9, dt);
+      hd.position.y = d === 0 ? Math.sin(clock.elapsedTime * 1.1) * 0.03 : 0;
+      hd.rotation.y = THREE.MathUtils.damp(hd.rotation.y, ry, 9, dt);
+      hd.scale.setScalar(THREE.MathUtils.damp(hd.scale.x, ts, 9, dt));
+      hd.visible = ad <= 4;
+      cs.rim.material.opacity = THREE.MathUtils.damp(cs.rim.material.opacity, d === 0 ? 1 : 0.25, 9, dt);
+      const lv = d === 0 ? 1 : 0.55;
+      cs.front.color.setScalar(THREE.MathUtils.damp(cs.front.color.r, lv, 9, dt));
+    });
+  }
+
+  panels.forEach((p, i) => {
+    const active = i === index;
+    const s = THREE.MathUtils.damp(p.g.scale.x, active ? 1.5 : 1.1, 8, dt);
+    p.g.scale.setScalar(s);
+    p.fill.material.opacity = THREE.MathUtils.damp(p.fill.material.opacity, active ? 0.1 : 0.03, 8, dt);
+    // dim unselected pods by darkening, not fading, so the letters stay solid
+    const lv = THREE.MathUtils.damp(p.text.material.color.r, active ? 1 : 0.55, 8, dt);
+    p.text.material.color.setScalar(lv);
+    p.text.material.opacity = 1;
+  });
+
+  const et = clock.elapsedTime * speed;
+  camZNow = THREE.MathUtils.damp(camZNow, xboxOpen ? camDistLib : camDist, 4, dt);
+  const camZ = camZNow;
+  camera.position.set(Math.sin(et * 0.1) * 0.3, 1.2 + Math.sin(et * 0.13) * 0.15, camZ);
+  camera.lookAt(0, 0, 0);
+
+  pollPad(t);
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+document.fonts?.load('900 100px Orbitron').then(() => {
+  panels.forEach(p => { p.text.material.map.dispose(); p.text.material.map = labelTexture(p.label); });
+  cases.forEach(cs => {
+    cs.front.map.dispose(); cs.front.map = coverTexture(cs.game, cs.i);
+    cs.spine.map.dispose(); cs.spine.map = spineTexture(cs.game);
+  });
+}).catch(() => {});
+
+requestAnimationFrame(frame);
+</script>

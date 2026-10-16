@@ -1,0 +1,545 @@
+<!doctype html>
+<!-- Orbit, an Xbox 360 homebrew launcher. Copyright (c) 2026 Noah Colbourne.
+     Licensed under the GNU General Public License v3.0 or later; see LICENSE. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Orbit asset bake</title>
+<!--
+  Draws Orbit's textures with the prototype's own canvas code and writes them as
+  JSON into #out. Run through Tools/bake.js (headless Chrome --dump-dom), which turns
+  the JSON into Media/*.tex and Media/*.fnt for the Xbox.
+-->
+<style>
+@font-face { font-family: 'Orbitron'; font-weight: 900; src: url(fonts/Orbitron-Black.woff2) format('woff2'); }
+@font-face { font-family: 'Michroma'; src: url(fonts/Michroma.woff2) format('woff2'); }
+@font-face { font-family: 'Share Tech Mono'; src: url(fonts/ShareTechMono.woff2) format('woff2'); }
+</style>
+</head>
+<body>
+<pre id="out">PENDING</pre>
+<script>
+'use strict';
+
+// HUD sizes are baked for 720 lines: the prototype's --u = 720 / 480
+const U = 1.5;
+
+/* ---------- prototype: menu panel texture (labelTexture, unchanged apart from returning the canvas) ---------- */
+function podPath(x, x0, y0, w, h, inset = 0) {
+  const k = h / 130;
+  const tl = [36 * k, 30 * k], tr = [54 * k, 24 * k], br = [40 * k, 36 * k], bl = [50 * k, 30 * k];
+  const X0 = x0 + inset, Y0 = y0 + inset, X1 = x0 + w - inset, Y1 = y0 + h - inset;
+  const q = inset * 0.4;
+  x.beginPath();
+  x.moveTo(X0 + tl[0] - q, Y0);
+  x.lineTo(X1 - tr[0] + q, Y0);
+  x.lineTo(X1, Y0 + tr[1] - q);
+  x.lineTo(X1, Y1 - br[1] + q);
+  x.lineTo(X1 - br[0] + q, Y1);
+  x.lineTo(X0 + bl[0] - q, Y1);
+  x.lineTo(X0, Y1 - bl[1] + q);
+  x.lineTo(X0, Y0 + tl[1] - q);
+  x.closePath();
+}
+function labelCanvas(text) {
+  const W = 1200, H = 400, pw = 1080, ph = 280;
+  const k = ph / 130;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const x0 = (W - pw) / 2, y0 = (H - ph) / 2;
+  x.save();
+  x.translate(W / 2, H / 2); x.rotate(-2 * Math.PI / 180); x.translate(-W / 2, -H / 2);
+  podPath(x, x0, y0, pw, ph);
+  x.fillStyle = '#4a0080';
+  x.shadowColor = 'rgba(179, 0, 255, 0.4)'; x.shadowBlur = 50 * k * 0.5; x.fill();
+  x.shadowColor = 'rgba(204, 51, 255, 0.7)'; x.shadowBlur = 25 * k * 0.5; x.fill();
+  x.shadowBlur = 0;
+  const g = x.createRadialGradient(x0 + pw * 0.35, y0 + ph * 0.35, 0, x0 + pw * 0.35, y0 + ph * 0.35, pw * 0.75);
+  g.addColorStop(0, '#b300ff'); g.addColorStop(0.6, '#4a0080'); g.addColorStop(1, '#1a0033');
+  podPath(x, x0, y0, pw, ph);
+  x.fillStyle = g; x.fill();
+  x.save(); podPath(x, x0, y0, pw, ph); x.clip();
+  x.shadowColor = 'rgba(255, 255, 255, 0.6)'; x.shadowBlur = 20 * k;
+  x.lineWidth = 6 * k; x.strokeStyle = 'rgba(255, 255, 255, 0.3)'; x.stroke();
+  x.restore();
+  const off = -5 * k;
+  const fg = x.createLinearGradient(x0, y0, x0 + pw * 0.4, y0 + ph);
+  fg.addColorStop(0, '#f2c8ff'); fg.addColorStop(0.45, '#cc33ff'); fg.addColorStop(1, '#6a1aa8');
+  x.save();
+  x.shadowColor = 'rgba(10, 0, 25, 0.85)'; x.shadowBlur = 6 * k; x.shadowOffsetX = 3 * k; x.shadowOffsetY = 4 * k;
+  podPath(x, x0 + off, y0 + off, pw, ph, 6 * k);
+  x.lineWidth = 12 * k; x.lineJoin = 'miter'; x.strokeStyle = fg; x.stroke();
+  x.restore();
+  x.save();
+  x.shadowColor = 'rgba(204, 51, 255, 0.9)'; x.shadowBlur = 14 * k;
+  podPath(x, x0 + off, y0 + off, pw, ph, 6 * k);
+  x.lineWidth = 12 * k; x.strokeStyle = fg; x.stroke();
+  x.restore();
+  podPath(x, x0 + off, y0 + off, pw, ph, 0.5 * k);
+  x.lineWidth = 1.4 * k; x.strokeStyle = 'rgba(255, 240, 255, 0.55)'; x.stroke();
+  podPath(x, x0 + off, y0 + off, pw, ph, 11.5 * k);
+  x.lineWidth = 1.4 * k; x.strokeStyle = 'rgba(20, 0, 40, 0.6)'; x.stroke();
+  x.restore();
+  const label = text.toUpperCase();
+  const fam = 'Orbitron, Impact, "Arial Black", sans-serif';
+  if ('letterSpacing' in x) x.letterSpacing = '2px';
+  let size = 120;
+  x.font = `900 ${size}px ${fam}`;
+  const maxW = pw * 0.78;
+  const mw = x.measureText(label).width;
+  if (mw > maxW) { size = Math.floor(size * maxW / mw); x.font = `900 ${size}px ${fam}`; }
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineJoin = 'round';
+  x.shadowColor = '#cc33ff'; x.shadowBlur = 10 * k;
+  x.lineWidth = 4 * k * 2; x.strokeStyle = '#df80ff';
+  x.strokeText(label, W / 2, H / 2 + 6);
+  x.shadowBlur = 0;
+  x.fillStyle = '#1a0033';
+  x.fillText(label, W / 2, H / 2 + 6);
+  return c;
+}
+
+/* ---------- HUD pod (CSS .pod, drawn with canvas at --u = 1.5) ---------- */
+function polyPct(x, pts, ox, oy, w, h) {
+  x.moveTo(ox + pts[0][0] * w, oy + pts[0][1] * h);
+  for (let i = 1; i < pts.length; i++) x.lineTo(ox + pts[i][0] * w, oy + pts[i][1] * h);
+  x.closePath();
+}
+// CSS linear-gradient(<angle>) as a canvas gradient over a w x h box
+function cssLinear(x, deg, ox, oy, w, h, stops) {
+  const a = deg * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a);
+  const L = Math.abs(w * dx) + Math.abs(h * dy);
+  const cx = ox + w / 2, cy = oy + h / 2;
+  const g = x.createLinearGradient(cx - dx * L / 2, cy - dy * L / 2, cx + dx * L / 2, cy + dy * L / 2);
+  stops.forEach(s => g.addColorStop(s[0], s[1]));
+  return g;
+}
+function podCanvas(letter) {
+  const w = 30 * U, h = 22 * U, pad = 24;
+  const W = Math.ceil(w + pad * 2), H = Math.ceil(h + pad * 2);
+  const cut = [[0.20, 0], [0.70, 0], [1, 0.18], [1, 0.72], [0.78, 1], [0.28, 1], [0, 0.77], [0, 0.23]];
+  const inner = [[0.228, 0.118], [0.087, 0.265], [0.087, 0.72], [0.304, 0.882], [0.739, 0.882], [0.913, 0.662], [0.913, 0.25], [0.674, 0.118]];
+
+  // pod body (unfiltered), rotated -8deg about its centre
+  const body = document.createElement('canvas'); body.width = W; body.height = H;
+  const x = body.getContext('2d');
+  x.translate(W / 2, H / 2); x.rotate(-8 * Math.PI / 180); x.translate(-w / 2, -h / 2);
+  // ::after: inset 1px, radial-gradient(circle at 35% 35%, core, deep 60%, ink)
+  {
+    const iw = w - 2, ih = h - 2, cx = 1 + iw * 0.35, cy = 1 + ih * 0.35;
+    const r = Math.hypot(iw * 0.65, ih * 0.65);
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, '#b300ff'); g.addColorStop(0.6, '#4a0080'); g.addColorStop(1, '#1a0033');
+    x.beginPath(); polyPct(x, cut, 1, 1, iw, ih); x.fillStyle = g; x.fill();
+  }
+  // ::before: the bevelled frame (outer cut minus inner hole)
+  x.beginPath(); polyPct(x, cut, 0, 0, w, h); polyPct(x, inner, 0, 0, w, h);
+  x.fillStyle = cssLinear(x, 160, 0, 0, w, h, [[0, '#f2c8ff'], [0.45, '#cc33ff'], [1, '#6a1aa8']]);
+  x.fill('evenodd');
+  // the menu panels' bevel: highlight on the frame's outer edge, dark line on its inner edge
+  x.lineWidth = 0.5 * U;
+  x.beginPath(); polyPct(x, cut, 0, 0, w, h); x.strokeStyle = 'rgba(255, 240, 255, 0.55)'; x.stroke();
+  x.beginPath(); polyPct(x, inner, 0, 0, w, h); x.strokeStyle = 'rgba(20, 0, 40, 0.6)'; x.stroke();
+  // letter, done like the menu panels: glowing lilac outline underneath, solid ink on top
+  x.save();
+  x.translate(w / 2, h / 2); x.rotate(8 * Math.PI / 180);
+  // two-letter bumpers (RB) shrink to fit the pod's middle
+  x.font = `900 ${(letter.length > 1 ? 8 : 11) * U}px Orbitron`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineJoin = 'round';
+  x.shadowColor = '#cc33ff'; x.shadowBlur = 4;
+  x.lineWidth = 2 * U; x.strokeStyle = '#df80ff'; x.strokeText(letter, 0, 1);
+  x.shadowBlur = 0;
+  x.fillStyle = '#1a0033'; x.fillText(letter, 0, 1);
+  x.restore();
+
+  // glow: the prototype's inner drop-shadow (0 0 4px rgba(204,51,255,.8)) only; its wider
+  // 9px halo tinted the pods pink on the TV, where the menu panels have none
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const y1 = out.getContext('2d');
+  y1.shadowColor = 'rgba(204, 51, 255, 0.8)'; y1.shadowBlur = 4; y1.drawImage(body, 0, 0);
+  return { canvas: out, boxW: w, boxH: h, pad };
+}
+
+/* ---------- cover art: the prototype's library cases, shared by the case templates below ---------- */
+// The abstract cover art (chamfer frames and a burst), centred at (cx, cy) and scaled by s
+function coverArt(x, game, i, cx, cy, s) {
+  const h = game.hue;
+  x.save(); x.translate(cx, cy); x.scale(s, s);
+  for (let k = 0; k < 6; k++) {
+    const r = 40 + k * 38 + (i % 3) * 6;
+    x.strokeStyle = `hsla(${h + 30} 100% 75% / ${0.35 - k * 0.05})`; x.lineWidth = 3;
+    x.rotate(0.12 + i * 0.07);
+    x.strokeRect(-r, -r * 0.7, r * 2, r * 1.4);
+  }
+  x.restore();
+  const rg = x.createRadialGradient(cx, cy, 0, cx, cy, 220 * s);
+  rg.addColorStop(0, `hsla(${h + 40} 100% 85% / 0.55)`); rg.addColorStop(1, 'hsla(0 0% 0% / 0)');
+  x.fillStyle = rg; x.fillRect(cx - 220 * s, cy - 220 * s, 440 * s, 440 * s);
+}
+
+/* ---------- shelf case templates: the prototype's covers without their words ---------- */
+// Orbit draws each game's title onto these on the console (Library.cpp), for games with
+// no box art. Six hues; a game's hue comes from its title. Drawn at 512 x 704, stored at 256 x 352.
+const TEMPLATE_HUES = [265, 300, 235, 320, 280, 250];
+function coverTemplate(h, i) {
+  const W = 512, H = 704;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, W * 0.4, H);
+  g.addColorStop(0, `hsl(${h} 95% 52%)`); g.addColorStop(0.55, `hsl(${h + 10} 85% 24%)`); g.addColorStop(1, `hsl(${h + 20} 90% 9%)`);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  coverArt(x, { hue: h }, i, W / 2, H * 0.62, 1);
+  // dark wash behind where the title goes, so it reads on any art
+  const tg = x.createLinearGradient(0, 64, 0, 330);
+  tg.addColorStop(0, 'rgba(15, 0, 30, 0.55)'); tg.addColorStop(1, 'rgba(15, 0, 30, 0)');
+  x.fillStyle = tg; x.fillRect(0, 64, W, 266);
+  x.fillStyle = 'rgba(15, 0, 30, 0.85)'; x.fillRect(0, 0, W, 64);
+  x.fillStyle = '#cc33ff'; x.fillRect(0, 62, W, 4);
+  x.font = '900 26px Orbitron, Impact, sans-serif'; x.textBaseline = 'middle';
+  if ('letterSpacing' in x) x.letterSpacing = '6px';
+  x.fillStyle = '#e9c8ff'; x.fillText('ORBIT', 22, 33);
+  x.fillStyle = 'rgba(15, 0, 30, 0.75)'; x.fillRect(0, H - 52, W, 52);
+  return c;
+}
+function backTemplate(h, i) {
+  const W = 512, H = 704;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(W, 0, W * 0.6, H);
+  g.addColorStop(0, `hsl(${h + 10} 80% 22%)`); g.addColorStop(0.5, `hsl(${h + 15} 85% 12%)`); g.addColorStop(1, `hsl(${h + 20} 90% 6%)`);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(15, 0, 30, 0.85)'; x.fillRect(0, 0, W, 64);
+  x.fillStyle = '#cc33ff'; x.fillRect(0, 62, W, 4);
+  x.font = '900 26px Orbitron, Impact, sans-serif'; x.textBaseline = 'middle';
+  if ('letterSpacing' in x) x.letterSpacing = '6px';
+  x.fillStyle = '#e9c8ff'; x.fillText('ORBIT', 22, 33);
+  const frame = (fx, fy, fw, fh, k) => {
+    x.save();
+    x.beginPath(); x.rect(fx, fy, fw, fh); x.clip();
+    const fg = x.createLinearGradient(fx, fy, fx + fw * 0.4, fy + fh);
+    fg.addColorStop(0, `hsl(${h + k * 12} 90% 45%)`); fg.addColorStop(1, `hsl(${h + 20 + k * 12} 90% 10%)`);
+    x.fillStyle = fg; x.fillRect(fx, fy, fw, fh);
+    coverArt(x, { hue: h }, i + k * 4, fx + fw / 2, fy + fh / 2, fh / 300);
+    x.restore();
+    x.lineWidth = 3; x.strokeStyle = '#cc33ff'; x.strokeRect(fx + 1.5, fy + 1.5, fw - 3, fh - 3);
+  };
+  // the top 120px under the band stay clear for the title and version line
+  frame(30, 200, W - 60, 230, 1);
+  frame(30, 446, (W - 76) / 2, 140, 2);
+  frame(46 + (W - 76) / 2, 446, (W - 76) / 2, 140, 3);
+  x.fillStyle = 'rgba(15, 0, 30, 0.75)'; x.fillRect(0, H - 52, W, 52);
+  x.fillStyle = '#cc33ff'; x.fillRect(0, H - 52, W, 3);
+  x.font = '18px "Share Tech Mono", monospace'; x.fillStyle = '#d9b8ff'; x.textAlign = 'left';
+  if ('letterSpacing' in x) x.letterSpacing = '4px';
+  x.fillText('ORBIT LIBRARY', 30, H - 25);
+  for (let k = 0; k < 22; k++) { x.fillStyle = '#e9c8ff'; x.fillRect(W - 150 + k * 5, H - 40, (k * 7 + i) % 3 + 1, 28); }
+  return c;
+}
+
+/* ---------- details card (the Files window's frame and panel, CSS .win / .wpanel) ---------- */
+function chamfer(x, X, Y, w, h, c) {
+  x.beginPath();
+  x.moveTo(X + c, Y); x.lineTo(X + w - c * 1.6, Y); x.lineTo(X + w, Y + c * 0.9);
+  x.lineTo(X + w, Y + h - c); x.lineTo(X + w - c * 1.2, Y + h); x.lineTo(X + c * 1.4, Y + h);
+  x.lineTo(X, Y + h - c * 0.9); x.lineTo(X, Y + c); x.closePath();
+}
+function cardCanvas(title) {
+  const w = 360 * U, h = 190 * U, pad = Math.ceil(24 * U);
+  const W = Math.ceil(w + pad * 2), H = Math.ceil(h + pad * 2);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  // frame with its glow (drop-shadow 8u .75 and 20u .4)
+  const fg = cssLinear(x, 160, pad, pad, w, h, [[0, '#f2c8ff'], [0.4, '#cc33ff'], [1, '#6a1aa8']]);
+  x.shadowColor = 'rgba(179, 0, 255, 0.4)'; x.shadowBlur = 20 * U;
+  chamfer(x, pad, pad, w, h, 18 * U); x.fillStyle = fg; x.fill();
+  x.shadowColor = 'rgba(204, 51, 255, 0.75)'; x.shadowBlur = 8 * U; x.fill();
+  x.shadowBlur = 0;
+  // panel
+  const b = 5 * U, px = pad + b, py = pad + b, pw = w - b * 2, ph = h - b * 2;
+  x.save();
+  chamfer(x, px, py, pw, ph, 15 * U); x.clip();
+  const pg = x.createRadialGradient(px + pw * 0.3, py + ph * 0.2, 0, px + pw * 0.3, py + ph * 0.2, Math.hypot(pw, ph) * 0.8);
+  pg.addColorStop(0, '#3a0870'); pg.addColorStop(0.45, '#22054a'); pg.addColorStop(1, '#12022a');
+  x.fillStyle = pg; x.fillRect(px, py, pw, ph);
+  for (let yy = py + ph - 1; yy > py; yy -= 3) { x.fillStyle = 'rgba(223, 128, 255, 0.05)'; x.fillRect(px, yy, pw, 1); }
+  // title bar: "ORBIT // <title>"
+  const barH = 24 * U;
+  const bg = x.createLinearGradient(px, 0, px + pw, 0);
+  bg.addColorStop(0, 'rgba(179, 0, 255, 0.35)'); bg.addColorStop(1, 'rgba(74, 0, 128, 0.2)');
+  x.fillStyle = bg; x.fillRect(px, py, pw, barH);
+  x.fillStyle = '#cc33ff'; x.fillRect(px, py + barH, pw, 2 * U);
+  x.textBaseline = 'middle';
+  x.font = `900 ${9 * U}px Orbitron`; if ('letterSpacing' in x) x.letterSpacing = `${9 * U * 0.12}px`;
+  x.shadowColor = '#cc33ff'; x.shadowBlur = 6; x.fillStyle = '#f6e6ff';
+  x.fillText('ORBIT', px + 14 * U, py + barH / 2 + 1); x.shadowBlur = 0;
+  const ow = x.measureText('ORBIT').width;
+  x.font = `${9 * U}px "Share Tech Mono"`; if ('letterSpacing' in x) x.letterSpacing = `${9 * U * 0.2}px`;
+  x.fillStyle = '#d9b8ff'; x.fillText(' // ' + title, px + 14 * U + ow, py + barH / 2 + 1);
+  x.restore();
+  return { canvas: c, boxW: w, boxH: h, pad };
+}
+/* ---------- file manager (CSS .win / .wpanel / .bar / .devs / .row.on / .dev.on) ---------- */
+// The window without its text: frame, panel, "ORBIT // <title>" bar and (for FILES) the
+// drive column's rule. Box 600u x 330u; the drive column is 118u wide inside the 5u frame.
+function filesWindowCanvas(title = 'FILES', column = true) {
+  const w = 600 * U, h = 330 * U, pad = Math.ceil(24 * U);
+  const W = Math.ceil(w + pad * 2), H = Math.ceil(h + pad * 2);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const fg = cssLinear(x, 160, pad, pad, w, h, [[0, '#f2c8ff'], [0.4, '#cc33ff'], [1, '#6a1aa8']]);
+  x.shadowColor = 'rgba(179, 0, 255, 0.4)'; x.shadowBlur = 20 * U;
+  chamfer(x, pad, pad, w, h, 18 * U); x.fillStyle = fg; x.fill();
+  x.shadowColor = 'rgba(204, 51, 255, 0.75)'; x.shadowBlur = 8 * U; x.fill();
+  x.shadowBlur = 0;
+  const b = 5 * U, px = pad + b, py = pad + b, pw = w - b * 2, ph = h - b * 2;
+  x.save();
+  chamfer(x, px, py, pw, ph, 15 * U); x.clip();
+  const pg = x.createRadialGradient(px + pw * 0.3, py + ph * 0.2, 0, px + pw * 0.3, py + ph * 0.2, Math.hypot(pw, ph) * 0.8);
+  pg.addColorStop(0, '#3a0870'); pg.addColorStop(0.45, '#22054a'); pg.addColorStop(1, '#12022a');
+  x.fillStyle = pg; x.fillRect(px, py, pw, ph);
+  // inset glow (box-shadow inset 0 0 14u rgba(204,51,255,.35))
+  x.save(); chamfer(x, px, py, pw, ph, 15 * U);
+  x.shadowColor = 'rgba(204, 51, 255, 0.35)'; x.shadowBlur = 14 * U; x.lineWidth = 6 * U; x.strokeStyle = 'rgba(204, 51, 255, 0.35)'; x.stroke();
+  x.restore();
+  for (let yy = py + ph - 1; yy > py; yy -= 3) { x.fillStyle = 'rgba(223, 128, 255, 0.05)'; x.fillRect(px, yy, pw, 1); }
+  const barH = 24 * U;
+  const bg = x.createLinearGradient(px, 0, px + pw, 0);
+  bg.addColorStop(0, 'rgba(179, 0, 255, 0.35)'); bg.addColorStop(1, 'rgba(74, 0, 128, 0.2)');
+  x.fillStyle = bg; x.fillRect(px, py, pw, barH);
+  x.fillStyle = '#cc33ff'; x.fillRect(px, py + barH, pw, 2 * U);
+  x.textBaseline = 'middle';
+  x.font = `900 ${9 * U}px Orbitron`; if ('letterSpacing' in x) x.letterSpacing = `${9 * U * 0.12}px`;
+  x.shadowColor = '#cc33ff'; x.shadowBlur = 6; x.fillStyle = '#f6e6ff';
+  x.fillText('ORBIT', px + 14 * U, py + barH / 2 + 1); x.shadowBlur = 0;
+  const ow = x.measureText('ORBIT').width;
+  x.font = `${9 * U}px "Share Tech Mono"`; if ('letterSpacing' in x) x.letterSpacing = `${9 * U * 0.2}px`;
+  x.fillStyle = '#d9b8ff'; x.fillText(' // ' + title, px + 14 * U + ow, py + barH / 2 + 1);
+  // drive column rule
+  if (column) { x.fillStyle = 'rgba(204, 51, 255, 0.4)'; x.fillRect(px + 118 * U, py + barH + 2 * U, 1 * U, ph - barH); }
+  x.restore();
+  return { canvas: c, boxW: w, boxH: h, pad };
+}
+// Selected file row (.row.on), drawn at 16u tall and stretched across the list
+function rowOnCanvas() {
+  const W = 512, H = Math.round(16 * U);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const cr = 6 * U;
+  x.beginPath(); x.moveTo(cr, 0); x.lineTo(W, 0); x.lineTo(W, H - cr); x.lineTo(W - cr, H); x.lineTo(0, H); x.lineTo(0, cr); x.closePath();
+  const g = x.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, '#b300ff'); g.addColorStop(0.65, '#4a0080'); g.addColorStop(1, 'rgba(74, 0, 128, 0.35)');
+  x.fillStyle = g; x.fill();
+  x.save(); x.clip(); x.lineWidth = 3 * U; x.strokeStyle = '#cc33ff'; x.stroke(); x.restore();
+  return c;
+}
+// Selected drive (.dev.on), 100u x 44u
+function devOnCanvas() {
+  const W = Math.round(100 * U), H = Math.round(44 * U);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const cd = 7 * U;
+  x.beginPath(); x.moveTo(cd, 0); x.lineTo(W, 0); x.lineTo(W, H - cd); x.lineTo(W - cd, H); x.lineTo(0, H); x.lineTo(0, cd); x.closePath();
+  const g = x.createRadialGradient(W * 0.3, H * 0.3, 0, W * 0.3, H * 0.3, Math.hypot(W, H) * 0.7);
+  g.addColorStop(0, '#b300ff'); g.addColorStop(0.7, '#4a0080'); g.addColorStop(1, '#1a0033');
+  x.fillStyle = g; x.fill();
+  x.save(); x.clip();
+  x.shadowColor = 'rgba(255, 255, 255, 0.25)'; x.shadowBlur = 8 * U; x.lineWidth = 4 * U; x.strokeStyle = '#cc33ff'; x.stroke();
+  x.restore();
+  return c;
+}
+function solidCanvas(css) {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 4;
+  const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0, 0, 4, 4);
+  return c;
+}
+
+// Toast panel: a small bevelled plum bar with a lilac edge and glow, baked as left cap /
+// middle / right cap so it stretches to fit any message. Box 26u tall; each cap 16u.
+function toastPieces() {
+  const h = 26 * U, cap = 16 * U, pad = Math.ceil(12 * U);
+  const boxW = cap * 3, W = Math.ceil(boxW + pad * 2), H = Math.ceil(h + pad * 2);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const shape = (X, Y, w, hh, k) => {
+    x.beginPath();
+    x.moveTo(X + k, Y); x.lineTo(X + w, Y); x.lineTo(X + w, Y + hh - k); x.lineTo(X + w - k, Y + hh);
+    x.lineTo(X, Y + hh); x.lineTo(X, Y + k); x.closePath();
+  };
+  // glow, then the lilac edge, then the plum fill inside it
+  x.shadowColor = 'rgba(204, 51, 255, 0.6)'; x.shadowBlur = 10 * U;
+  shape(pad, pad, boxW, h, 8 * U); x.fillStyle = '#cc33ff'; x.fill();
+  x.shadowBlur = 0;
+  const e = 1.5 * U;
+  const g = x.createLinearGradient(0, pad, 0, pad + h);
+  g.addColorStop(0, '#2c0656'); g.addColorStop(1, '#14022b');
+  shape(pad + e, pad + e, boxW - e * 2, h - e * 2, 7 * U); x.fillStyle = g; x.fill();
+  // a faint highlight along the top inside edge
+  x.fillStyle = 'rgba(242, 200, 255, 0.18)'; x.fillRect(pad + 9 * U, pad + e, boxW - 18 * U, 1 * U);
+  const cut = (sx, sw) => {
+    const p = document.createElement('canvas'); p.width = Math.round(sw); p.height = H;
+    p.getContext('2d').drawImage(c, sx, 0, sw, H, 0, 0, sw, H);
+    return p;
+  };
+  const l = Math.round(pad + cap), m = Math.round(cap);
+  return { left: cut(0, l), mid: cut(l, m), right: cut(l + m, W - l - m), boxH: h, cap, pad };
+}
+
+// Screen dim behind the card (.term background rgba(10, 0, 22, 0.55)), stretched at runtime
+function dimCanvas() {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 4;
+  const x = c.getContext('2d'); x.fillStyle = 'rgba(10, 0, 22, 0.55)'; x.fillRect(0, 0, 4, 4);
+  return c;
+}
+
+/* ---------- bitmap fonts: R = glyph coverage, G = glow coverage ---------- */
+// runtime codes 1, 2 = left / right triangles, 3 = middle dot, 4, 5 = up / down triangles
+const SPECIALS = { 1: '◀', 2: '▶', 3: '·', 4: '▲', 5: '▼' };
+function fontAtlas(family, size, glowBlur, weight = 400) {
+  const codes = [];
+  for (let c = 32; c < 127; c++) codes.push(c);
+  codes.push(1, 2, 3, 4, 5);
+  const font = `${weight} ${size}px ${family}`;
+  const m = document.createElement('canvas').getContext('2d');
+  m.font = font;
+  const probe = m.measureText('Hg◀');
+  const ascent = Math.ceil(probe.actualBoundingBoxAscent) + 2;
+  const descent = Math.ceil(probe.actualBoundingBoxDescent) + 2;
+  const pad = Math.ceil(glowBlur * 1.5) + 2;
+  const cellH = ascent + descent + pad * 2;
+
+  const glyphs = codes.map(code => {
+    const ch = SPECIALS[code] || String.fromCharCode(code);
+    const mt = m.measureText(ch);
+    const left = Math.max(0, Math.ceil(-mt.actualBoundingBoxLeft));
+    const right = Math.ceil(Math.max(mt.width, mt.actualBoundingBoxRight));
+    return { code, ch, advance: mt.width, extraL: left, w: right + left + pad * 2 };
+  });
+
+  const AW = 512;
+  let px = 0, py = 0;
+  glyphs.forEach(g => {
+    if (px + g.w > AW) { px = 0; py += cellH; }
+    g.x = px; g.y = py; px += g.w;
+  });
+  const AH = py + cellH;
+
+  const glyphC = document.createElement('canvas'); glyphC.width = AW; glyphC.height = AH;
+  const glowC = document.createElement('canvas'); glowC.width = AW; glowC.height = AH;
+  const gx = glyphC.getContext('2d'), wx = glowC.getContext('2d');
+  [gx, wx].forEach(c => { c.font = font; c.textBaseline = 'alphabetic'; c.fillStyle = '#fff'; });
+  wx.shadowColor = '#fff'; wx.shadowBlur = glowBlur; wx.shadowOffsetX = 10000;
+  glyphs.forEach(g => {
+    const bx = g.x + pad + g.extraL, by = g.y + pad + ascent;
+    gx.fillText(g.ch, bx, by);
+    if (glowBlur > 0) wx.fillText(g.ch, bx - 10000, by);
+  });
+
+  const a = gx.getImageData(0, 0, AW, AH).data, b = wx.getImageData(0, 0, AW, AH).data;
+  const argb = new Uint8Array(AW * AH * 4);
+  for (let i = 0; i < AW * AH; i++) {
+    argb[i * 4 + 0] = 255;          // A
+    argb[i * 4 + 1] = a[i * 4 + 3]; // R: glyph
+    argb[i * 4 + 2] = b[i * 4 + 3]; // G: glow
+    argb[i * 4 + 3] = 0;            // B
+  }
+  return {
+    size, ascent, pad,
+    tex: { levels: [{ w: AW, h: AH, data: b64(argb) }] },
+    glyphs: glyphs.map(g => ({ code: g.code, x: g.x, y: g.y, w: g.w, h: cellH, ox: -(pad + g.extraL), oy: -(pad + ascent), adv: g.advance })),
+  };
+}
+
+/* ---------- pixel helpers ---------- */
+function b64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// Premultiplied ARGB bytes (A,R,G,B order = big-endian A8R8G8B8 on the 360)
+function premulARGB(canvas) {
+  const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  const out = new Uint8Array(d.length);
+  for (let i = 0; i < d.length; i += 4) {
+    const al = d[i + 3];
+    out[i] = al;
+    out[i + 1] = Math.round(d[i] * al / 255);
+    out[i + 2] = Math.round(d[i + 1] * al / 255);
+    out[i + 3] = Math.round(d[i + 2] * al / 255);
+  }
+  return b64(out);
+}
+function resized(src, w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(src, 0, 0, w, h);
+  return c;
+}
+function mipChain(src, w, h, levels) {
+  const out = [];
+  let cur = resized(src, w, h);
+  for (let i = 0; i < levels; i++) {
+    out.push({ w: cur.width, h: cur.height, data: premulARGB(cur) });
+    cur = resized(cur, Math.max(1, cur.width >> 1), Math.max(1, cur.height >> 1));
+  }
+  return out;
+}
+
+/* ---------- bake ---------- */
+async function bake() {
+  await Promise.all([
+    document.fonts.load('900 100px Orbitron'),
+    document.fonts.load('20px Michroma'),
+    document.fonts.load('20px "Share Tech Mono"'),
+  ]);
+  const ok = document.fonts.check('900 100px Orbitron') && document.fonts.check('20px Michroma') && document.fonts.check('20px "Share Tech Mono"');
+  if (!ok) throw new Error('fonts did not load');
+
+  const assets = { textures: {}, fonts: {} };
+  ['Xbox', 'Xbox 360', 'Arcade', 'Apps', 'Files', 'Settings'].forEach((label, i) => {
+    assets.textures['ring' + i] = { levels: mipChain(labelCanvas(label), 768, 256, 4) };
+  });
+  ['A', 'B', 'X', 'Y', 'RB'].forEach(letter => {
+    const p = podCanvas(letter);
+    assets.textures['pod_' + letter.toLowerCase()] = { levels: [{ w: p.canvas.width, h: p.canvas.height, data: premulARGB(p.canvas) }], boxW: p.boxW, boxH: p.boxH, pad: p.pad };
+  });
+  // .hud / .top text: Share Tech Mono 9u with the keys' 6px glow; Michroma for ORBIT, the menu name and the toast
+  assets.fonts.mono = fontAtlas('"Share Tech Mono", "Segoe UI Symbol", monospace', 9 * U, 6);
+  assets.fonts.display = fontAtlas('Michroma, "Segoe UI Symbol", sans-serif', 9 * U, 0);
+  // .gameinfo .gt: Orbitron Black 18u with its 8px glow
+  assets.fonts.title = fontAtlas('Orbitron, sans-serif', 18 * U, 8, 900);
+
+  // Shelf case templates (the console writes each game's title on them)
+  TEMPLATE_HUES.forEach((h, i) => {
+    assets.textures['cover_tpl' + i] = { levels: mipChain(coverTemplate(h, i), 256, 352, 1) };
+    assets.textures['back_tpl' + i] = { levels: mipChain(backTemplate(h, i), 256, 352, 1) };
+  });
+  const card = cardCanvas('DETAILS');
+  assets.textures.card = { levels: [{ w: card.canvas.width, h: card.canvas.height, data: premulARGB(card.canvas) }], boxW: card.boxW, boxH: card.boxH, pad: card.pad };
+  const cardLib = cardCanvas('LIBRARY');
+  assets.textures.card_lib = { levels: [{ w: cardLib.canvas.width, h: cardLib.canvas.height, data: premulARGB(cardLib.canvas) }], boxW: cardLib.boxW, boxH: cardLib.boxH, pad: cardLib.pad };
+  // Toast panel in three stretchable pieces; the .inf on the left cap holds box height, cap width, pad
+  const tp = toastPieces();
+  assets.textures.toast_l = { levels: [{ w: tp.left.width, h: tp.left.height, data: premulARGB(tp.left) }], boxW: tp.cap, boxH: tp.boxH, pad: tp.pad };
+  assets.textures.toast_m = { levels: [{ w: tp.mid.width, h: tp.mid.height, data: premulARGB(tp.mid) }] };
+  assets.textures.toast_r = { levels: [{ w: tp.right.width, h: tp.right.height, data: premulARGB(tp.right) }] };
+  assets.textures.dim = { levels: [{ w: 4, h: 4, data: premulARGB(dimCanvas()) }] };
+
+  // File manager
+  const fw = filesWindowCanvas();
+  assets.textures.files_win = { levels: [{ w: fw.canvas.width, h: fw.canvas.height, data: premulARGB(fw.canvas) }], boxW: fw.boxW, boxH: fw.boxH, pad: fw.pad };
+  const sw = filesWindowCanvas('SETTINGS', false);
+  assets.textures.settings_win = { levels: [{ w: sw.canvas.width, h: sw.canvas.height, data: premulARGB(sw.canvas) }], boxW: sw.boxW, boxH: sw.boxH, pad: sw.pad };
+  const ro = rowOnCanvas(), dv = devOnCanvas();
+  assets.textures.row_on = { levels: [{ w: ro.width, h: ro.height, data: premulARGB(ro) }] };
+  assets.textures.dev_on = { levels: [{ w: dv.width, h: dv.height, data: premulARGB(dv) }] };
+  assets.textures.seg_on  = { levels: [{ w: 4, h: 4, data: premulARGB(solidCanvas('#df80ff')) }] };
+  assets.textures.seg_off = { levels: [{ w: 4, h: 4, data: premulARGB(solidCanvas('rgba(223, 128, 255, 0.18)')) }] };
+  return assets;
+}
+
+bake().then(a => { document.getElementById('out').textContent = JSON.stringify(a); })
+      .catch(e => { document.getElementById('out').textContent = 'ERROR ' + e.message; });
+</script>
+</body>
+</html>
