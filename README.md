@@ -27,7 +27,7 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 ## Requirements
 
 - An Xbox 360 that can run homebrew with Dashlaunch: softmodded (BadUpdate, ABadAvatar or Peer Pressure) or hardware modded (RGH or JTAG).
-- A FAT32 USB drive, or the console's hard drive.
+- A USB drive formatted as FAT32. You need one to move Orbit and your files from a PC to the console. Orbit can run from the USB drive itself, or be copied to the console's internal hard drive (with FILES or another file manager).
 
 ## Try it out (already modded, using Aurora)
 
