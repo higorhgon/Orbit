@@ -17,8 +17,9 @@
 //                   inside a lip with a sheen
 //   cover level   : 1 front / 0.55 others (the side cases are dimmer)
 //
-// The items come from the scan (Scan.h). Box art comes from Usb0:\Orbit\Covers\<title
-// ID>.jpg (or .png): a full box scan (back | spine | front side by side, XboxUnity's
+// The items come from the scan (Scan.h). Box art comes from the Covers folder next to
+// Orbit.xex (game:\Covers\<title ID>.jpg or .png), or from Usb0:\Orbit\Covers\, where
+// versions before 0.9.1 looked. A full box scan (back | spine | front side by side, XboxUnity's
 // 900 x 600 layout) wraps the whole case and gives it a back cover; a portrait image
 // is just the front. Without art, a cover is made here on the console: a baked
 // template (one of six hues, picked from the title) with the title written on it,
@@ -54,7 +55,9 @@ extern "C"
 static const char* c_szShelfNames[NUM_SHELVES] = { "XBOX", "XBOX 360", "ARCADE", "APPS" };
 static const char* c_szShelfKinds[NUM_SHELVES] = { "ORIGINAL XBOX", "XBOX 360", "ARCADE", "APP" };
 static const BOOL  c_bShelfBacks[NUM_SHELVES]  = { TRUE, TRUE, FALSE, FALSE };   // drawn backs: only boxed games
-static const char* COVERS_DIR = "Usb0:\\Orbit\\Covers\\";
+// Covers folders, searched in order: Orbit's own folder (on whatever drive it runs
+// from), then the USB location older versions used
+static const char* c_szCoverDirs[] = { "game:\\Covers\\", "Usb0:\\Orbit\\Covers\\" };
 
 // Where each face sits in a box scan (fractions of its width): back | spine | front
 static const float WRAP_SPINE_L = 425.0f / 900.0f, WRAP_SPINE_R = 475.0f / 900.0f;
@@ -243,6 +246,10 @@ HRESULT Library_Init( D3DDevice* pDevice )
         HslToLinear( (float)TEMPLATE_HUES[i], 0.60f, 0.20f, s_vEdge[i] );
     }
 
+    // Make the covers folder next to Orbit.xex, ready for box art (fails harmlessly if
+    // it's already there)
+    CreateDirectoryA( "game:\\Covers", NULL );
+
     // Covers are drawn into this and resolved into their own textures. EDRAM base 0,
     // like the post targets: it's only used before the frame's scene starts.
     D3DSURFACE_PARAMETERS Params;
@@ -380,22 +387,23 @@ static void LoadArt( D3DDevice* pDevice, int nShelf, int i )
     if( !it.szTitleId[0] )
         return;
     static const char* c_szExt[] = { "jpg", "png" };
-    for( int e = 0; e < ARRAYSIZE( c_szExt ); e++ )
-    {
-        char szPath[MAX_PATH];
-        sprintf_s( szPath, "%s%s.%s", COVERS_DIR, it.szTitleId, c_szExt[e] );
-        if( GetFileAttributesA( szPath ) == (DWORD)-1 )
-            continue;
-        D3DTexture* pTex = NULL;
-        if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT,
-                                                  0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
-            continue;
-        D3DSURFACE_DESC Desc;
-        pTex->GetLevelDesc( 0, &Desc );
-        s_pArt[nShelf][i] = pTex;
-        s_Art[nShelf][i] = ( Desc.Width > Desc.Height * 1.2f ) ? ART_WRAP : ART_FRONT;
-        return;
-    }
+    for( int d = 0; d < ARRAYSIZE( c_szCoverDirs ); d++ )
+        for( int e = 0; e < ARRAYSIZE( c_szExt ); e++ )
+        {
+            char szPath[MAX_PATH];
+            sprintf_s( szPath, "%s%s.%s", c_szCoverDirs[d], it.szTitleId, c_szExt[e] );
+            if( GetFileAttributesA( szPath ) == (DWORD)-1 )
+                continue;
+            D3DTexture* pTex = NULL;
+            if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT,
+                                                      0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
+                continue;
+            D3DSURFACE_DESC Desc;
+            pTex->GetLevelDesc( 0, &Desc );
+            s_pArt[nShelf][i] = pTex;
+            s_Art[nShelf][i] = ( Desc.Width > Desc.Height * 1.2f ) ? ART_WRAP : ART_FRONT;
+            return;
+        }
 }
 
 // Whether X can turn this item round: boxed shelves only (a box scan, or a drawn back)

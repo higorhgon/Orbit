@@ -11,6 +11,7 @@ Orbit is in development (v0.9). So far it has been tested on one console: an Xbo
 - **Working:** original Xbox games, installed Xbox 360 games (Games on Demand), Arcade games, apps, FILES, box art.
 - **Not tested yet:** extracted Xbox 360 games (game folders with a `default.xex`, rather than installed packages).
 - **Not supported yet:** launching game discs.
+- **Not included:** an FTP server, and downloading box art or title updates from inside Orbit. Add covers and updates from a PC (see [Box art](#box-art) and [Title updates and DLC](#title-updates-and-dlc)), or keep Aurora installed alongside Orbit for those.
 
 If something doesn't work on your setup, please [open an issue](../../issues).
 
@@ -139,7 +140,7 @@ Orbit keeps its paths in `paths.txt` and the last scan in `library.txt`, next to
 
 Box art is optional; games without it get a cover drawn for them.
 
-1. Create a folder called `Orbit`, with a `Covers` folder inside it, in the **root of your USB drive**: `Usb0:\Orbit\Covers\`. Orbit doesn't create it for you, and it only looks on the USB drive for now.
+1. Find the `Covers` folder inside Orbit's own folder, for example `Usb0:\Apps\Orbit\Covers\` or `Hdd1:\Apps\Orbit\Covers\`. Orbit creates it the first time it starts, on whichever drive it runs from. (Covers in `Usb0:\Orbit\Covers\`, where versions before 0.9.1 looked, still work.)
 2. Put covers in it named by title ID, for example `4D5307E6.jpg` for Halo 3. A game's title ID is shown in its content folder name (`Content\0000000000000000\<TitleID>`) or on xboxunity.net.
 3. Run **SCAN NOW** in SETTINGS, or restart Orbit, to load them.
 
