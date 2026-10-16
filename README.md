@@ -26,30 +26,53 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 
 ## Requirements
 
-- An Xbox 360 that can run unsigned code, for example through BadUpdate, RGH or JTAG, with Dashlaunch.
+- An Xbox 360 that can run homebrew with Dashlaunch: softmodded (BadUpdate, ABadAvatar or Peer Pressure) or hardware modded (RGH or JTAG).
 - A FAT32 USB drive, or the console's hard drive.
 
-## Install
+## Try it out (already modded, using Aurora)
 
-1. Download the latest zip from [Releases](../../releases).
-2. Copy `Orbit.xex` and the `Media` folder into one folder, for example `Usb0:\Apps\Orbit\`.
-3. Launch `Orbit.xex` from your current dashboard. To boot straight into Orbit, set it as the default in Dashlaunch's `launch.ini`:
+If your console is already modded and you use Aurora, you can try Orbit without changing anything:
+
+1. Download the latest zip from [Releases](../../releases) and unzip it.
+2. Copy the `Orbit` folder (with `Orbit.xex` and `Media` inside) into your apps folder, for example `Usb0:\Apps\Orbit`.
+3. Launch `Orbit.xex` from Aurora: from its homebrew list if Aurora scans your apps folder, or with Aurora's file browser.
+4. In Orbit, open **SETTINGS** and add your content paths (see [Setting up your content paths](#setting-up-your-content-paths)), then **SCAN NOW**.
+
+Orbit doesn't change your console's settings or Aurora's. Pressing Xbox Home takes you back to Aurora as usual, and to remove Orbit you just delete its folder.
+
+## Install (new users, or making Orbit your dashboard)
+
+1. Get your console running homebrew with Dashlaunch first, using one of these:
+   - **Softmods** (no opening the console):
+     - [BadUpdate](https://github.com/grimdoomer/Xbox360BadUpdate): a software-only exploit.
+     - ABadAvatar: a software exploit used the same way as BadUpdate.
+     - [Peer Pressure](https://github.com/grimdoomer/Xbox360PeerPressure): a persistent softmod.
+   - **Hardware mods:** RGH (Reset Glitch Hack) or JTAG. These need the console opened and modified; if you already have one, Dashlaunch is usually set up with it.
+
+   With BadUpdate or ABadAvatar, use [XeUnshackle Max](https://github.com/klofi/XeUnshackle-Max) as the payload. It applies the patches and loads Dashlaunch, which is what lets Orbit become your dashboard.
+
+   Video tutorials by MrMario2011:
+   - [Peer Pressure beginner setup](https://youtu.be/G8ceM_xXlO8)
+   - [XeUnshackle Max for BadUpdate or ABadAvatar](https://youtu.be/P2hOdoLzQ38)
+   - [Updating BadUpdate to 1.3](https://youtu.be/zADjXH8SFmI)
+
+   **These guides set up Aurora as the dashboard.** Wherever they use Aurora, such as copying it to your drive or pointing `Default =` at it in `launch.ini`, use Orbit instead (steps 2–4 below). You can still install Aurora alongside Orbit as a backup, on a button you hold at boot (step 4).
+2. Download the latest zip from [Releases](../../releases) and unzip it.
+3. Copy the `Orbit` folder (with `Orbit.xex` and `Media` inside) to your drive, for example `Usb0:\Apps\Orbit`.
+4. To boot straight into Orbit, set it as the default in Dashlaunch's `launch.ini`:
    ```ini
    Default = Usb:\Apps\Orbit\Orbit.xex
    ```
-   Keep a button pointing at another dashboard, so you can still reach it by holding that button at boot:
+   If you have another dashboard such as Aurora, keep a button pointing at it so you can still reach it by holding that button at boot:
    ```ini
    LBump = Usb:\Apps\Aurora\Aurora.xex
    ```
    Use a button you don't press in menus, such as LB or RB, not A or B. Dashlaunch also checks held buttons when you go back to Xbox Home, so if Aurora is on A, choosing Xbox Home with A opens Aurora instead of Orbit.
+5. Start the console, open **SETTINGS** in Orbit, add your content paths and **SCAN NOW**.
 
-   If Orbit ever fails to start, it tries to open Aurora from `Usb0:\Apps\Aurora\Aurora.xex`, then the dashboard.
+If Orbit ever fails to start, it tries to open Aurora from `Usb0:\Apps\Aurora\Aurora.xex`, then the dashboard. Holding Y at boot (if your `launch.ini` points Y at the stock dashboard) is another way back.
 
-### Box art
-
-Put covers in `Usb0:\Orbit\Covers\`, named by title ID, for example `4D5307E6.jpg` for Halo 3. Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
-
-### Setting up your content paths
+## Setting up your content paths
 
 Orbit starts with no paths, so the shelves are empty until you tell it where your games are.
 
@@ -60,23 +83,53 @@ Orbit starts with no paths, so the shelves are empty until you tell it where you
 
 Orbit puts each item on the right shelf by what it is, not by which folder it's in, so one path can fill several shelves.
 
-#### Depth
+### Depth
 
 Depth is how many folder levels Orbit looks down from the path. It stops going down as soon as it finds a game. Depth 1 means only the folder itself. Each extra level makes the scan a little slower, so use the smallest depth that reaches your games.
 
-| What you're adding | Example layout | Depth |
-|---|---|---|
-| A folder of extracted 360 games (not tested yet) | `Usb0:\Games\<Game>\default.xex` | **2** |
-| A folder of original Xbox games | `Hdd1:\Xbox\Halo\default.xbe` | **2** |
-| A folder of apps (it must be named **Apps**) | `Usb0:\Apps\Simple 360 NAND Flasher\default.xex` | **2** |
-| Installed games, Arcade and Games on Demand | `Hdd1:\Content\0000000000000000\<TitleID>\…` | **3** |
-| The same, including games installed under a profile | `Hdd1:\Content` | **4** |
+### Which drive things can go on
 
+| Content | Internal drive (`Hdd1`) | USB drive (`Usb0`) |
+|---|---|---|
+| Homebrew apps | Yes | Yes |
+| Games on Demand (GOD) and Arcade games | Yes | Yes |
+| Xbox 360 game rips | Yes | Yes |
+| **Original Xbox games** | **Yes** | **No:** they show up but won't play |
+| Title updates and DLC | Yes | No (see [Title updates and DLC](#title-updates-and-dlc)) |
+
+### Example: everything on the internal drive
+
+| Path | Depth | What it's for |
+|---|---|---|
+| `Hdd1:\Apps` | **2** | Homebrew apps, one folder each, e.g. `Hdd1:\Apps\Simple 360 NAND Flasher\default.xex`. Fills the APPS shelf. The folder must be named **Apps**. |
+| `Hdd1:\Content\0000000000000000` | **3** | Installed content: GOD packages, Arcade games and app packages. Fills the XBOX 360, ARCADE and APPS shelves. |
+| `Hdd1:\OG_Xbox` | **2** | Original Xbox games, one folder each with a `default.xbe`, e.g. `Hdd1:\OG_Xbox\Halo\default.xbe`. Fills the XBOX shelf. The folder name is up to you. |
+| `Hdd1:\Games` | **2** | Xbox 360 game rips, e.g. `Hdd1:\Games\<Game>\default.xex`. Fills the XBOX 360 shelf. *Not tested yet.* |
+
+### Example: games on a USB drive
+
+The same layout moves to `Usb0`, except original Xbox games, which stay on the internal drive:
+
+| Path | Depth | What it's for |
+|---|---|---|
+| `Usb0:\Apps` | **2** | Homebrew apps. Fills the APPS shelf. |
+| `Usb0:\Content\0000000000000000` | **3** | GOD packages, Arcade games and app packages on the USB drive. |
+| `Usb0:\Games` | **2** | Xbox 360 game rips. *Not tested yet.* |
+| `Hdd1:\Content\0000000000000000` | **3** | Anything installed on the internal drive. DLC (and some title updates) also live here; they don't appear on the shelves. |
+| `Hdd1:\OG_Xbox` | **2** | Original Xbox games: internal drive only. |
+
+You can mix both: add a path for each place you keep things.
+
+- **GOD vs rips:** a Games on Demand game is a single installed package that lives under `Content\0000000000000000\<TitleID>\00007000`. A rip is a plain folder of the disc's files with a `default.xex`. Both end up on the XBOX 360 shelf; they just need different paths and depths.
 - Anything with a `.xex` inside a folder named **Apps** goes on the APPS shelf. Elsewhere, a `default.xex` counts as an Xbox 360 game.
-- Installed content needs the same paths on each drive that has it, for example both `Hdd1:\Content\0000000000000000` and `Usb0:\Content\0000000000000000`.
+- Games installed under a profile live in `Content\<profile ID>` instead of `Content\0000000000000000`. To include those too, add `Hdd1:\Content` (or `Usb0:\Content`) at depth **4**.
 - Removing a path: select it and press **X** twice. **DELETE ALL PATHS** clears the whole list (press **A** twice). Run **SCAN NOW** afterwards to update the shelves.
 
 Orbit keeps its paths in `paths.txt` and the last scan in `library.txt`, next to `Orbit.xex`.
+
+## Box art
+
+Put covers in `Usb0:\Orbit\Covers\`, named by title ID, for example `4D5307E6.jpg` for Halo 3. Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
 
 ## Title updates and DLC
 
