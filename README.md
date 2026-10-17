@@ -4,6 +4,8 @@ A homebrew launcher for modded Xbox 360 consoles. Orbit puts your original Xbox 
 
 > Orbit is a fan project. It is not made, endorsed or supported by Microsoft or Xbox.
 
+https://github.com/user-attachments/assets/2f005d76-3fcf-49ae-a5dc-5ab38ad2fd03
+
 ## Status
 
 Orbit is in development (v0.9). So far it has been tested on one console: an Xbox 360 S (Trinity) running BadUpdate.
