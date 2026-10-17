@@ -454,6 +454,9 @@ void Render()
         Orb_RenderShell( g_pd3dDevice, matViewProj, vEye, g_Time.fOrbTime, g_fPulse, g_fOrbY );
     Ring_Render( g_pd3dDevice, matView, matProj, vEye, RING_FRONT_TRACK, fOrbDepth );
     Post_EndFrame( g_pd3dDevice );
+    Post_SetSceneDepth( g_pd3dDevice, TRUE );
+    Ring_Render( g_pd3dDevice, matView, matProj, vEye, RING_BACK_PANELS, fOrbDepth );
+    Post_SetSceneDepth( g_pd3dDevice, FALSE );
     Ring_Render( g_pd3dDevice, matView, matProj, vEye, RING_FRONT_PANELS, fOrbDepth );
     Library_Render( g_pd3dDevice, matView, matProj );
     Files_Render( g_pd3dDevice );

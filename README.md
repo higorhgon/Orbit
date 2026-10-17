@@ -19,12 +19,12 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 
 ## Features
 
-- **Main menu:** a ring of six items: XBOX, XBOX 360, ARCADE, APPS, FILES, SETTINGS.
+- **Main menu:** a ring of six items: XBOX, XBOX 360, ARCADE, APPS, FILES, SETTINGS. Items you don't use can be hidden (see [Hiding menu items](#hiding-menu-items)).
 - **Shelves:** 3D game cases (black for original Xbox, green for 360, orange for Arcade) with your box art. Games without art get a cover drawn for them.
   - **A** launch, **X** back cover, **Y** details (title, version, size, delete).
 - **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
 - **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste and delete. System folders are protected.
-- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan.
+- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items.
 - **Sorting:** items go on the right shelf by what they are, not by which folder they're in.
 
 ## Requirements
@@ -137,6 +137,17 @@ You can mix both: add a path for each place you keep things.
 - Removing a path: select it and press **X** twice. **DELETE ALL PATHS** clears the whole list (press **A** twice). Run **SCAN NOW** afterwards to update the shelves.
 
 Orbit keeps its paths in `paths.txt` and the last scan in `library.txt`, next to `Orbit.xex`.
+
+## Hiding menu items
+
+If you don't use some parts of the menu (for example, you have no original Xbox games), you can take them off the ring:
+
+1. Open **SETTINGS** and go down to **MENU**.
+2. Select an item (XBOX, XBOX 360, ARCADE, APPS or FILES) and press **A** to switch it between **ON** and **OFF**.
+
+Hidden items disappear from the ring and the rest spread out to fill the gap. Nothing is deleted; switch an item back **ON** to bring it back. **SETTINGS** can't be hidden, so you can always get back to these switches, and at least one other item has to stay on.
+
+Your choices are saved in `menu.txt`, next to `Orbit.xex`.
 
 ## Box art
 

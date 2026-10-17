@@ -14,16 +14,17 @@
 #include "Hud.h"
 #include "Drives.h"
 #include "Scan.h"
+#include "Ring.h"
 #include "Settings.h"
 
 static const float ART_U = 1.5f;
 static const int   MAX_PICK = 512;
 
-enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_REFRESH };
+enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_MENU, LINE_REFRESH };
 struct Line
 {
     int         nKind;
-    int         nPath;      // LINE_PATH: which path
+    int         nPath;      // LINE_PATH: which path; LINE_MENU: which ring item
     const char* szText;     // LINE_HEADER
 };
 
@@ -80,6 +81,9 @@ static int BuildLines( Line* pLines )
     l.nKind = LINE_HEADER;  l.szText = "LIBRARY"; pLines[n++] = l; l.szText = NULL;
     l.nKind = LINE_SCAN;    pLines[n++] = l;
     l.nKind = LINE_CLEAR;   pLines[n++] = l;
+    l.nKind = LINE_HEADER;  l.szText = "MENU"; pLines[n++] = l; l.szText = NULL;
+    for( int i = 0; i < RING_ITEMS - 1; i++ ) { l.nKind = LINE_MENU; l.nPath = i; pLines[n++] = l; }   // all but SETTINGS
+    l.nPath = -1;
     l.nKind = LINE_HEADER;  l.szText = "DRIVES"; pLines[n++] = l; l.szText = NULL;
     l.nKind = LINE_REFRESH; pLines[n++] = l;
     return n;
@@ -173,8 +177,10 @@ static void UpdateKeys()
     const Line& l = Lines[LineOfSelection( Lines, nLines, s_nSel )];
     static const HudKey c_Path[]   = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_NONE, "\x01 \x02 DEPTH" }, { HUD_POD_X, "REMOVE" }, { HUD_POD_B, "BACK" } };
     static const HudKey c_Action[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SELECT" }, { HUD_POD_B, "BACK" } };
-    if( l.nKind == LINE_PATH ) Hud_SetKeys( c_Path, ARRAYSIZE( c_Path ) );
-    else                       Hud_SetKeys( c_Action, ARRAYSIZE( c_Action ) );
+    static const HudKey c_Switch[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SHOW / HIDE" }, { HUD_POD_B, "BACK" } };
+    if( l.nKind == LINE_PATH )      Hud_SetKeys( c_Path, ARRAYSIZE( c_Path ) );
+    else if( l.nKind == LINE_MENU ) Hud_SetKeys( c_Switch, ARRAYSIZE( c_Switch ) );
+    else                            Hud_SetKeys( c_Action, ARRAYSIZE( c_Action ) );
 }
 
 
@@ -396,6 +402,15 @@ void Settings_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
         }
         break;
 
+    case LINE_MENU:
+        if( wPressed & XINPUT_GAMEPAD_A )
+        {
+            BOOL bShow = !Ring_IsShown( pLine->nPath );
+            if( !Ring_SetShown( pLine->nPath, bShow ) )
+                Toast( "CAN'T HIDE EVERY MENU ITEM" );
+        }
+        break;
+
     case LINE_REFRESH:
         if( wPressed & XINPUT_GAMEPAD_A )
         {
@@ -595,6 +610,16 @@ void Settings_Render( D3DDevice* pDevice )
             if( s_bClearConfirm )
             {
                 strcpy_s( szValue, "PRESS A AGAIN TO DELETE ALL" );
+                pValueColor = &C_WARN;
+            }
+            break;
+        case LINE_MENU:
+            szLabel = Ring_GetLabel( l.nPath );
+            if( Ring_IsShown( l.nPath ) )
+                strcpy_s( szValue, "ON" );
+            else
+            {
+                strcpy_s( szValue, "OFF" );
                 pValueColor = &C_WARN;
             }
             break;

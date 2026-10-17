@@ -6,6 +6,7 @@
 //   CONTENT PATHS  the scan paths (like Aurora's Manage Paths): left / right sets a
 //                  path's depth, X removes it (press twice), "+ ADD PATH" picks a folder
 //   LIBRARY        SCAN NOW (rebuilds the shelves), DELETE ALL PATHS (press A twice)
+//   MENU           shows or hides each ring item but SETTINGS (A switches ON / OFF)
 //   DRIVES         REFRESH DRIVES (what's connected, free space, disc in the tray)
 
 #pragma once

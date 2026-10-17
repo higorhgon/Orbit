@@ -335,3 +335,12 @@ void Post_EndFrame( D3DDevice* pDevice )
     Post_DrawQuad( pDevice );
     ClearSamplers( pDevice );
 }
+
+
+//-------------------------------------------------------------------------------------
+// Name: Post_SetSceneDepth()
+//-------------------------------------------------------------------------------------
+void Post_SetSceneDepth( D3DDevice* pDevice, BOOL bBind )
+{
+    pDevice->SetDepthStencilSurface( bBind ? s_pDepth : NULL );
+}

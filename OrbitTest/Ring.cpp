@@ -8,12 +8,15 @@
 //                 scale eases to 1.5 (selected) / 1.1. Colour level is 0.8 for all of
 //                 them, so the selected one only grows (the prototype's 1.0 / 0.55,
 //                 and its full fog, made the back panels too dark to read on a TV).
-//                 The front panels draw after bloom, so the orb's glow can't wash
-//                 them out. The prototype faces the panels outward, which hides all
+//                 All panels draw after bloom, so the orb's lavender glow can't
+//                 wash them out or tint the back ones blue. The prototype faces the panels outward, which hides all
 //                 but the front one; here each turns to face the camera so all six
 //                 can be read around the ring.
 //   track       : radius 3.5 +- 0.02 annulus at y = -0.45, #b98aff at 25%
 //   all of it   : transparent, no depth write, linear fog #4a0080 from 6 to 13
+//   hiding      : SETTINGS can switch off any item but itself (saved to game:\menu.txt).
+//                 The shown ones spread evenly round the ring, easing to their new
+//                 places, and a hidden panel shrinks away.
 //
 
 #include "stdafx.h"
@@ -26,13 +29,14 @@
 #include "Shaders\TrackPS.h"
 
 static const float RADIUS      = 3.5f;
-static const float STEP        = XM_2PI / RING_ITEMS;
 static const float FOG_NEAR    = 6.0f;
 static const float FOG_FAR     = 13.0f;
 static const UINT  TRACK_SEGS  = 128;
 static const float LEVEL_ACTIVE = 0.8f;    // prototype: 1.0; matched to the others
 static const float LEVEL_IDLE   = 0.8f;    // prototype: 0.55, too dark to read on a TV
 static const float PANEL_FOG_MAX = 0.5f;   // panels never fog more than halfway, so the back ones read
+static const int   ITEM_SETTINGS = RING_ITEMS - 1;   // always shown, or there'd be no way back
+static const char* MENU_FILE   = "game:\\menu.txt";
 
 static const char* c_szLabels[RING_ITEMS] = { "XBOX", "XBOX 360", "ARCADE", "APPS", "FILES", "SETTINGS" };
 
@@ -53,6 +57,9 @@ static int   s_nIndex = 0;
 static float s_fRot   = 0.0f;
 static float s_fScale[RING_ITEMS];
 static float s_fLevel[RING_ITEMS];
+static BOOL  s_bShown[RING_ITEMS];
+static float s_fShow[RING_ITEMS];    // eases to 1 shown / 0 hidden; multiplies the panel's scale
+static float s_fAngle[RING_ITEMS];   // where on the ring each panel sits, easing to its slot
 
 static BOOL  s_bDepthTest = TRUE;
 static float s_fRingScale = 1.0f;   // ring group scale (three.js ring.scale)
@@ -70,6 +77,67 @@ static float SRGBToLinear( BYTE c )
 static float Damp( float x, float y, float fLambda, float dt )
 {
     return x + ( y - x ) * ( 1.0f - expf( -fLambda * dt ) );
+}
+
+
+// Shortest signed turn from a to b
+static float AngleDiff( float a, float b )
+{
+    return atan2f( sinf( b - a ), cosf( b - a ) );
+}
+
+// Where item i belongs: the shown items share the ring evenly, in order
+static float SlotAngle( int i )
+{
+    int nShown = 0, nSlot = 0;
+    for( int j = 0; j < RING_ITEMS; j++ )
+        if( s_bShown[j] )
+        {
+            if( j < i ) nSlot++;
+            nShown++;
+        }
+    return nSlot * XM_2PI / max( nShown, 1 );
+}
+
+// Menu file: one line per item, "<label> TAB <1 shown | 0 hidden>"; anything missing stays shown
+static void LoadMenu()
+{
+    FILE* f = NULL;
+    if( fopen_s( &f, MENU_FILE, "r" ) != 0 || !f )
+        return;
+    char szLine[64];
+    while( fgets( szLine, sizeof(szLine), f ) )
+    {
+        szLine[strcspn( szLine, "\r\n" )] = 0;
+        char* pTab = strchr( szLine, '\t' );
+        if( !pTab )
+            continue;
+        *pTab = 0;
+        for( int i = 0; i < ITEM_SETTINGS; i++ )
+            if( strcmp( szLine, c_szLabels[i] ) == 0 )
+                s_bShown[i] = atoi( pTab + 1 ) != 0;
+    }
+    fclose( f );
+}
+
+static void SaveMenu()
+{
+    FILE* f = NULL;
+    if( fopen_s( &f, MENU_FILE, "w" ) != 0 || !f )
+        return;
+    for( int i = 0; i < ITEM_SETTINGS; i++ )
+        fprintf( f, "%s\t%d\n", c_szLabels[i], s_bShown[i] ? 1 : 0 );
+    fclose( f );
+}
+
+// The next shown item from nFrom, stepping nDir (+1 / -1)
+static int NextShown( int nFrom, int nDir )
+{
+    int i = nFrom;
+    do
+        i = ( i + nDir + RING_ITEMS ) % RING_ITEMS;
+    while( !s_bShown[i] && i != nFrom );
+    return i;
 }
 
 
@@ -99,7 +167,19 @@ HRESULT Ring_Init( D3DDevice* pDevice )
         Assets_LoadTexture( pDevice, szName, &s_pTex[i] );
         s_fScale[i] = 1.0f;
         s_fLevel[i] = 1.0f;
+        s_bShown[i] = TRUE;
     }
+
+    // Which items are switched off; start on the first shown one, already in place
+    LoadMenu();
+    s_bShown[ITEM_SETTINGS] = TRUE;
+    s_nIndex = s_bShown[0] ? 0 : NextShown( 0, 1 );
+    for( int i = 0; i < RING_ITEMS; i++ )
+    {
+        s_fShow[i]  = s_bShown[i] ? 1.0f : 0.0f;
+        s_fAngle[i] = SlotAngle( i );
+    }
+    s_fRot = -s_fAngle[s_nIndex];
 
     // Track: strip alternating outer / inner edge, flat in XZ at y = -0.45
     for( UINT i = 0; i <= TRACK_SEGS; i++ )
@@ -128,6 +208,32 @@ const char* Ring_GetLabel( int nIndex )
     return c_szLabels[ ( nIndex % RING_ITEMS + RING_ITEMS ) % RING_ITEMS ];
 }
 
+BOOL Ring_IsShown( int nIndex )
+{
+    return ( nIndex >= 0 && nIndex < RING_ITEMS ) ? s_bShown[nIndex] : FALSE;
+}
+
+BOOL Ring_SetShown( int nIndex, BOOL bShown )
+{
+    if( nIndex < 0 || nIndex >= ITEM_SETTINGS )
+        return FALSE;
+    if( !bShown )
+    {
+        // Keep at least one item besides SETTINGS
+        int nOthers = 0;
+        for( int i = 0; i < ITEM_SETTINGS; i++ )
+            if( s_bShown[i] && i != nIndex )
+                nOthers++;
+        if( nOthers == 0 )
+            return FALSE;
+    }
+    s_bShown[nIndex] = bShown;
+    if( !s_bShown[s_nIndex] )
+        s_nIndex = NextShown( s_nIndex, 1 );
+    SaveMenu();
+    return TRUE;
+}
+
 
 //-------------------------------------------------------------------------------------
 // Name: Ring_Update()
@@ -135,12 +241,19 @@ const char* Ring_GetLabel( int nIndex )
 void Ring_Update( float dt, int nMove )
 {
     if( nMove )
-        s_nIndex = ( s_nIndex + nMove + RING_ITEMS ) % RING_ITEMS;
+        s_nIndex = NextShown( s_nIndex, nMove > 0 ? 1 : -1 );
 
-    // Ease the shortest way round to -index * step
-    float fTarget = -s_nIndex * STEP;
-    float fDiff = atan2f( sinf( fTarget - s_fRot ), cosf( fTarget - s_fRot ) );
-    s_fRot += fDiff * ( 1.0f - expf( -6.0f * dt ) );
+    // Panels ease to their slots and shrink away when hidden
+    for( int i = 0; i < RING_ITEMS; i++ )
+    {
+        if( s_bShown[i] )
+            s_fAngle[i] += AngleDiff( s_fAngle[i], SlotAngle( i ) ) * ( 1.0f - expf( -6.0f * dt ) );
+        s_fShow[i] = Damp( s_fShow[i], s_bShown[i] ? 1.0f : 0.0f, 8.0f, dt );
+    }
+
+    // Ease the shortest way round to bring the selected panel to the front
+    float fTarget = -s_fAngle[s_nIndex];
+    s_fRot += AngleDiff( s_fRot, fTarget ) * ( 1.0f - expf( -6.0f * dt ) );
     s_fRot = fmodf( s_fRot, XM_2PI );
 
     for( int i = 0; i < RING_ITEMS; i++ )
@@ -165,8 +278,8 @@ struct DrawItem
 void Ring_Render( D3DDevice* pDevice, const XMMATRIX& matView, const XMMATRIX& matProj,
                   const XMVECTOR& vEye, int nPass, float fSplitDepth )
 {
-    const BOOL bBack    = ( nPass == RING_BACK );
-    const BOOL bOverlay = ( nPass == RING_FRONT_PANELS );
+    const BOOL bBack    = ( nPass == RING_BACK || nPass == RING_BACK_PANELS );
+    const BOOL bOverlay = ( nPass == RING_BACK_PANELS || nPass == RING_FRONT_PANELS );
 
     // ring.visible = scale > 0.01
     const float S = s_fRingScale;
@@ -191,13 +304,13 @@ void Ring_Render( D3DDevice* pDevice, const XMMATRIX& matView, const XMMATRIX& m
         }
         else
         {
-            if( !s_pTex[i] )
+            if( !s_pTex[i] || s_fShow[i] < 0.01f )
                 continue;
             // Where the ring puts this panel, then a yaw that faces the camera
-            float a = i * STEP + s_fRot;
+            float a = s_fAngle[i] + s_fRot;
             float px = sinf( a ) * RADIUS * S, pz = cosf( a ) * RADIUS * S;
             float fYaw = atan2f( XMVectorGetX( vEye ) - px, XMVectorGetZ( vEye ) - pz );
-            float fScale = s_fScale[i] * S;
+            float fScale = s_fScale[i] * s_fShow[i] * S;
             it.nPanel = i;
             it.matWorld = XMMatrixTranslation( 0.0f, 0.0f, 0.07f )
                         * XMMatrixScaling( fScale, fScale, fScale )
@@ -210,8 +323,8 @@ void Ring_Render( D3DDevice* pDevice, const XMMATRIX& matView, const XMMATRIX& m
         it.fDepth = -XMVectorGetZ( vView );
         if( bBack ? ( it.fDepth > fSplitDepth ) : ( it.fDepth <= fSplitDepth ) )
         {
-            // In front, the track stays in the scene and the panels go on top after bloom
-            if( bBack || bOverlay == ( it.nPanel >= 0 ) )
+            // The track stays in the scene; the panels go on top after bloom
+            if( bOverlay == ( it.nPanel >= 0 ) )
                 Items[nItems++] = it;
         }
     }
@@ -223,8 +336,9 @@ void Ring_Render( D3DDevice* pDevice, const XMMATRIX& matView, const XMMATRIX& m
             DrawItem t = Items[j]; Items[j] = Items[j - 1]; Items[j - 1] = t;
         }
 
-    // The back buffer pass has no depth buffer (nothing it overlaps is nearer)
-    pDevice->SetRenderState( D3DRS_ZENABLE, ( s_bDepthTest && !bOverlay ) ? D3DZB_TRUE : D3DZB_FALSE );
+    // The near panels ignore depth (nothing they overlap is nearer); the far ones test
+    // against the scene's depth so the orb's core still hides them
+    pDevice->SetRenderState( D3DRS_ZENABLE, ( s_bDepthTest && nPass != RING_FRONT_PANELS ) ? D3DZB_TRUE : D3DZB_FALSE );
 
     float vOut[4] = { 0.0f, 1.0f, 1.0f, 0.0f };
     if( bOverlay )

@@ -21,6 +21,11 @@ void Post_BeginScene( D3DDevice* pDevice );
 // can draw overlays, then Presents.
 void Post_EndFrame( D3DDevice* pDevice );
 
+// After Post_EndFrame: binds (TRUE) or unbinds the scene's depth buffer to the back
+// buffer, so overlays can be hidden by the orb. The depth is still in EDRAM, past
+// the tiles the back buffer and the bloom passes use.
+void Post_SetSceneDepth( D3DDevice* pDevice, BOOL bBind );
+
 // TV trims applied in the final pass (see Tuning.h; the prototype has 1.0, 1.0, 1.0)
 void Post_SetTrims( float fBloomStrength, float fRedGain, float fGamma );
 
