@@ -26,7 +26,6 @@
 // UnrealBloomPass settings from the prototype: new UnrealBloomPass(res, 1.0, 0.45, 0.45)
 //-------------------------------------------------------------------------------------
 static const UINT  NUM_MIPS        = 5;
-static const float BLOOM_STRENGTH  = 1.0f;
 static const float BLOOM_RADIUS    = 0.45f;
 static const UINT  c_KernelRadius[NUM_MIPS] = { 3, 5, 7, 9, 11 };
 static const float c_BloomFactors[NUM_MIPS] = { 1.0f, 0.8f, 0.6f, 0.4f, 0.2f };
@@ -61,7 +60,11 @@ static D3DPixelShader*       s_pFinalPS    = NULL;
 
 static float s_vBlurWeights[NUM_MIPS][12];
 static float s_vFactors[8];
-static float s_vTrims[4] = { BLOOM_STRENGTH, 1.0f, 1.0f, 0.0f };
+// TV trims, picked by eye on a TV to match the prototype on a PC monitor (the
+// prototype itself is 1.0, 1.0, 1.0): x = bloom strength, y = red gain in linear
+// light, z = output gamma exponent (below 1 lifts the mid-tones a TV darkens)
+static float s_vTrims[4] = { 0.6f, 2.0f, 0.9f, 0.0f };
+static float s_fThemeTurns = 0.0f;   // colour theme: hue turn, 0 = purple (see ThemeSRGB)
 
 
 
@@ -243,20 +246,23 @@ static void SetTexel( D3DDevice* pDevice, const Target& src )
 
 
 //-------------------------------------------------------------------------------------
-// Name: Post_SetTrims()
+// Name: Post_GetTrims()
 //-------------------------------------------------------------------------------------
-void Post_SetTrims( float fBloomStrength, float fRedGain, float fGamma )
-{
-    s_vTrims[0] = fBloomStrength;
-    s_vTrims[1] = fRedGain;
-    s_vTrims[2] = fGamma;
-}
-
-
 void Post_GetTrims( float vTrims[4] )
 {
     for( int i = 0; i < 4; i++ )
         vTrims[i] = s_vTrims[i];
+    vTrims[0] = s_fThemeTurns;   // the overlays have no bloom; x carries the theme instead
+}
+
+
+//-------------------------------------------------------------------------------------
+// Name: Post_SetTheme()
+//-------------------------------------------------------------------------------------
+void Post_SetTheme( float fHueDegrees, BOOL bFixed )
+{
+    // A fixed hue rides 10 turns up, which ThemeSRGB reads as "set, don't add"
+    s_fThemeTurns = fHueDegrees / 360.0f + ( bFixed ? 10.0f : 0.0f );
 }
 
 
@@ -330,6 +336,8 @@ void Post_EndFrame( D3DDevice* pDevice )
     SetViewport( pDevice, g_Screen.Width, g_Screen.Height );
     pDevice->SetPixelShader( s_pFinalPS );
     pDevice->SetPixelShaderConstantF( 0, s_vTrims, 1 );
+    float vTheme[4] = { s_fThemeTurns, 0.0f, 0.0f, 0.0f };
+    pDevice->SetPixelShaderConstantF( 1, vTheme, 1 );
     SetSampler( pDevice, 0, s_Scene.pTex, FALSE );
     SetSampler( pDevice, 1, s_Bloom.pTex, TRUE );
     Post_DrawQuad( pDevice );

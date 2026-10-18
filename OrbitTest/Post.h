@@ -26,11 +26,15 @@ void Post_EndFrame( D3DDevice* pDevice );
 // the tiles the back buffer and the bloom passes use.
 void Post_SetSceneDepth( D3DDevice* pDevice, BOOL bBind );
 
-// TV trims applied in the final pass (see Tuning.h; the prototype has 1.0, 1.0, 1.0)
-void Post_SetTrims( float fBloomStrength, float fRedGain, float fGamma );
-
-// x = bloom strength, y = red gain, z = gamma exponent (for the HUD shaders)
+// For the overlay shaders (HUD, panels, cases): x = theme hue turn, y = red gain,
+// z = gamma exponent
 void Post_GetTrims( float vTrims[4] );
+
+// Colour theme: turns every hue on screen by this many degrees (0 = Orbit's purple),
+// or with bFixed paints every colour in that one hue. Applied last, after the TV
+// trims, to the scene, the ring panels and the HUD; the shelf cases and box art keep
+// their real colours.
+void Post_SetTheme( float fHueDegrees, BOOL bFixed );
 
 // Full-target RECTLIST with uv (0,0) top-left. Caller sets the pixel shader; this
 // sets the vertex shader, declaration and quad states.

@@ -38,9 +38,6 @@ void    Hud_SetDetails( int nRows, const char* const* pszLabels, const char* con
 // Call with the back buffer set, after Post_EndFrame
 void    Hud_Render( D3DDevice* pDevice );
 
-// Small lines of text under the top bar (tuning readout); '\n' separates lines
-void    Hud_DrawDebug( D3DDevice* pDevice, const char* szText );
-
 // Drawing for views that lay out their own panels (the file manager). Positions are
 // back buffer pixels; call between Hud_BeginDraw and Hud_EndDraw with the back buffer
 // set. Colours are sRGB 0..1; a is opacity (for a glow, its strength; 0 = none).

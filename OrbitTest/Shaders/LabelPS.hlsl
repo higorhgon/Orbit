@@ -13,7 +13,7 @@
 sampler2D g_Tex     : register(s0);
 float4    g_vParams : register(c0);   // x = colour level, y = fog near, z = fog far, w = most fog allowed
 float4    g_vFog    : register(c1);   // fog colour, linear
-float4    g_vOut    : register(c2);   // y = red gain, z = gamma exponent, w = 1 when drawing
+float4    g_vOut    : register(c2);   // x = theme turns, y = red gain, z = gamma exponent, w = 1 when drawing
                                       // straight to the back buffer (after bloom), 0 into the scene
 
 float4 main( float2 UV : TEXCOORD0, float Depth : TEXCOORD1 ) : COLOR
@@ -27,7 +27,7 @@ float4 main( float2 UV : TEXCOORD0, float Depth : TEXCOORD1 ) : COLOR
     if( g_vOut.w > 0.5 )
     {
         c.r *= g_vOut.y;
-        c = pow( LinearToSRGB( saturate( c ) ), g_vOut.z );
+        c = ThemeSRGB( pow( LinearToSRGB( saturate( c ) ), g_vOut.z ), g_vOut.x );
     }
     return float4( c * a, a );
 }

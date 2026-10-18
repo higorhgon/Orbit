@@ -15,12 +15,13 @@
 #include "Drives.h"
 #include "Scan.h"
 #include "Ring.h"
+#include "Post.h"
 #include "Settings.h"
 
 static const float ART_U = 1.5f;
 static const int   MAX_PICK = 512;
 
-enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_MENU, LINE_REFRESH };
+enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_MENU, LINE_THEME, LINE_REFRESH };
 struct Line
 {
     int         nKind;
@@ -47,6 +48,27 @@ static int      s_nPickRow  = 0;
 static int      s_nPickTop  = 0;
 
 static BOOL     s_bWasScanning = FALSE;
+
+// Colour themes. Most turn Orbit's purples round the colour wheel by fHue. BLUE and
+// RED instead paint every colour in one hue (bFixed), so they come out as a clean
+// blue and red rather than wherever each purple happens to land.
+struct Theme
+{
+    const char* szName;
+    float       fHue;      // degrees: a turn, or the hue itself when bFixed
+    BOOL        bFixed;
+};
+static const Theme c_Themes[] =
+{
+    { "PURPLE",    0.0f, FALSE },
+    { "BLUE",    230.0f, TRUE  },
+    { "GREEN",  -160.0f, FALSE },
+    { "ORANGE",   95.0f, FALSE },
+    { "RED",     355.0f, TRUE  },
+};
+static const int   NUM_THEMES = ARRAYSIZE( c_Themes );
+static const char* THEME_FILE = "game:\\theme.txt";
+static int         s_nTheme   = 0;
 
 static D3DTexture* s_pWin   = NULL;
 static SpriteInfo  s_WinInfo;
@@ -84,6 +106,7 @@ static int BuildLines( Line* pLines )
     l.nKind = LINE_HEADER;  l.szText = "MENU"; pLines[n++] = l; l.szText = NULL;
     for( int i = 0; i < RING_ITEMS - 1; i++ ) { l.nKind = LINE_MENU; l.nPath = i; pLines[n++] = l; }   // all but SETTINGS
     l.nPath = -1;
+    l.nKind = LINE_THEME;   pLines[n++] = l;
     l.nKind = LINE_HEADER;  l.szText = "DRIVES"; pLines[n++] = l; l.szText = NULL;
     l.nKind = LINE_REFRESH; pLines[n++] = l;
     return n;
@@ -111,6 +134,40 @@ static void Upper( char* sz )
 {
     for( ; *sz; sz++ )
         *sz = (char)toupper( (unsigned char)*sz );
+}
+
+// theme.txt holds the theme's name; anything unknown is purple
+static void SetTheme( int nTheme, BOOL bSave )
+{
+    s_nTheme = ( nTheme % NUM_THEMES + NUM_THEMES ) % NUM_THEMES;
+    Post_SetTheme( c_Themes[s_nTheme].fHue, c_Themes[s_nTheme].bFixed );
+    if( !bSave )
+        return;
+    FILE* f = NULL;
+    if( fopen_s( &f, THEME_FILE, "w" ) == 0 && f )
+    {
+        fprintf( f, "%s\n", c_Themes[s_nTheme].szName );
+        fclose( f );
+    }
+}
+
+static void LoadTheme()
+{
+    int nTheme = 0;
+    FILE* f = NULL;
+    if( fopen_s( &f, THEME_FILE, "r" ) == 0 && f )
+    {
+        char sz[32] = "";
+        if( fgets( sz, sizeof(sz), f ) )
+        {
+            sz[strcspn( sz, "\r\n" )] = 0;
+            for( int i = 0; i < NUM_THEMES; i++ )
+                if( _stricmp( sz, c_Themes[i].szName ) == 0 )
+                    nTheme = i;
+        }
+        fclose( f );
+    }
+    SetTheme( nTheme, FALSE );
 }
 
 static void Toast( const char* sz, float fSeconds = 1.8f )
@@ -178,9 +235,11 @@ static void UpdateKeys()
     static const HudKey c_Path[]   = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_NONE, "\x01 \x02 DEPTH" }, { HUD_POD_X, "REMOVE" }, { HUD_POD_B, "BACK" } };
     static const HudKey c_Action[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SELECT" }, { HUD_POD_B, "BACK" } };
     static const HudKey c_Switch[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SHOW / HIDE" }, { HUD_POD_B, "BACK" } };
-    if( l.nKind == LINE_PATH )      Hud_SetKeys( c_Path, ARRAYSIZE( c_Path ) );
-    else if( l.nKind == LINE_MENU ) Hud_SetKeys( c_Switch, ARRAYSIZE( c_Switch ) );
-    else                            Hud_SetKeys( c_Action, ARRAYSIZE( c_Action ) );
+    static const HudKey c_Theme[]  = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_NONE, "\x01 \x02 COLOUR" }, { HUD_POD_B, "BACK" } };
+    if( l.nKind == LINE_PATH )       Hud_SetKeys( c_Path, ARRAYSIZE( c_Path ) );
+    else if( l.nKind == LINE_MENU )  Hud_SetKeys( c_Switch, ARRAYSIZE( c_Switch ) );
+    else if( l.nKind == LINE_THEME ) Hud_SetKeys( c_Theme, ARRAYSIZE( c_Theme ) );
+    else                             Hud_SetKeys( c_Action, ARRAYSIZE( c_Action ) );
 }
 
 
@@ -193,6 +252,7 @@ HRESULT Settings_Init( D3DDevice* pDevice )
         s_pWin = NULL;
     Assets_LoadTexture( pDevice, "row_on", &s_pRowOn );
     Assets_LoadTexture( pDevice, "dim", &s_pDim );
+    LoadTheme();
     return S_OK;
 }
 
@@ -411,6 +471,12 @@ void Settings_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
         }
         break;
 
+    case LINE_THEME:
+        // Left / right (or A, forward) change it, and the screen follows straight away
+        if( nMoveX || ( wPressed & XINPUT_GAMEPAD_A ) )
+            SetTheme( s_nTheme + ( nMoveX ? nMoveX : 1 ), TRUE );
+        break;
+
     case LINE_REFRESH:
         if( wPressed & XINPUT_GAMEPAD_A )
         {
@@ -622,6 +688,13 @@ void Settings_Render( D3DDevice* pDevice )
                 strcpy_s( szValue, "OFF" );
                 pValueColor = &C_WARN;
             }
+            break;
+        case LINE_THEME:
+            szLabel = "THEME";
+            if( bOn )
+                sprintf_s( szValue, "\x01 %s \x02", c_Themes[s_nTheme].szName );
+            else
+                strcpy_s( szValue, c_Themes[s_nTheme].szName );
             break;
         case LINE_REFRESH:
         {

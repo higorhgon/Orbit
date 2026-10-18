@@ -61,7 +61,6 @@ static BOOL  s_bShown[RING_ITEMS];
 static float s_fShow[RING_ITEMS];    // eases to 1 shown / 0 hidden; multiplies the panel's scale
 static float s_fAngle[RING_ITEMS];   // where on the ring each panel sits, easing to its slot
 
-static BOOL  s_bDepthTest = TRUE;
 static float s_fRingScale = 1.0f;   // ring group scale (three.js ring.scale)
 static float s_vFogColor[4];
 static float s_vTrackColor[4];
@@ -200,7 +199,6 @@ HRESULT Ring_Init( D3DDevice* pDevice )
 
 
 int  Ring_GetIndex() { return s_nIndex; }
-void Ring_SetDepthTest( BOOL bEnable ) { s_bDepthTest = bEnable; }
 void Ring_SetScale( float fScale ) { s_fRingScale = fScale; }
 
 const char* Ring_GetLabel( int nIndex )
@@ -338,7 +336,7 @@ void Ring_Render( D3DDevice* pDevice, const XMMATRIX& matView, const XMMATRIX& m
 
     // The near panels ignore depth (nothing they overlap is nearer); the far ones test
     // against the scene's depth so the orb's core still hides them
-    pDevice->SetRenderState( D3DRS_ZENABLE, ( s_bDepthTest && nPass != RING_FRONT_PANELS ) ? D3DZB_TRUE : D3DZB_FALSE );
+    pDevice->SetRenderState( D3DRS_ZENABLE, ( nPass != RING_FRONT_PANELS ) ? D3DZB_TRUE : D3DZB_FALSE );
 
     float vOut[4] = { 0.0f, 1.0f, 1.0f, 0.0f };
     if( bOverlay )

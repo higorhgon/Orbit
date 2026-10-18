@@ -15,11 +15,12 @@
 sampler2D g_Scene  : register(s0);   // fp16, point
 sampler2D g_Bloom  : register(s1);   // half res, bilinear
 float4    g_vTrims : register(c0);   // x = bloom strength, y = red gain, z = gamma exponent
+float4    g_vTheme : register(c1);   // x = theme turns (see ThemeSRGB)
 
 float4 main( float2 UV : TEXCOORD0 ) : COLOR
 {
     float3 c = tex2D( g_Scene, UV ).rgb + BloomDecode( tex2D( g_Bloom, UV ).rgb ) * g_vTrims.x;
     c.r *= g_vTrims.y;
     float3 s = LinearToSRGB( saturate( c ) );
-    return float4( pow( s, g_vTrims.z ), 1.0 );
+    return float4( ThemeSRGB( pow( s, g_vTrims.z ), g_vTheme.x ), 1.0 );
 }

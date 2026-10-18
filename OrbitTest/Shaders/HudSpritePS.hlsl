@@ -10,7 +10,7 @@
 
 sampler2D g_Tex     : register(s0);
 float4    g_vParams : register(c0);   // x = opacity, y = colour level (linear, like the menu panels)
-float4    g_vTrims  : register(c1);   // y = red gain, z = gamma exponent
+float4    g_vTrims  : register(c1);   // x = theme turns, y = red gain, z = gamma exponent
 
 float4 main( float2 UV : TEXCOORD0 ) : COLOR
 {
@@ -18,6 +18,6 @@ float4 main( float2 UV : TEXCOORD0 ) : COLOR
     float  a = t.a * g_vParams.x;
     float3 lin = SRGBToLinear( t.rgb / max( t.a, 0.001 ) ) * g_vParams.y;
     lin.r *= g_vTrims.y;
-    float3 c = pow( LinearToSRGB( saturate( lin ) ), g_vTrims.z );
+    float3 c = ThemeSRGB( pow( LinearToSRGB( saturate( lin ) ), g_vTrims.z ), g_vTrims.x );
     return float4( c * a, a );
 }

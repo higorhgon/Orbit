@@ -11,7 +11,7 @@
 sampler2D g_Font  : register(s0);
 float4    g_vText : register(c0);   // text colour (sRGB) and opacity
 float4    g_vGlow : register(c1);   // glow colour (sRGB) and strength (0 = none)
-float4    g_vTrims : register(c2);  // y = red gain, z = gamma exponent
+float4    g_vTrims : register(c2);  // x = theme turns, y = red gain, z = gamma exponent
 
 float4 main( float2 UV : TEXCOORD0 ) : COLOR
 {

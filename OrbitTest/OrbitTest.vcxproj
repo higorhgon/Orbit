@@ -281,7 +281,6 @@
     <ClInclude Include="Post.h" />
     <ClInclude Include="Ring.h" />
     <ClInclude Include="Screen.h" />
-    <ClInclude Include="Tuning.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
@@ -297,7 +296,6 @@
     <ClCompile Include="Orb.cpp" />
     <ClCompile Include="Post.cpp" />
     <ClCompile Include="Ring.cpp" />
-    <ClCompile Include="Tuning.cpp" />
     <ClCompile Include="OrbitTest.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Xbox 360'">Create</PrecompiledHeader>

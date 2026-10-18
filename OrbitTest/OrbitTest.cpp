@@ -15,16 +15,12 @@
 // Main menu: left / right turns the ring, A pulses the orb and opens the item's view.
 // B goes back out of a view and does nothing on the main menu.
 //
-// Developer tools: the Back button shows colour tuning bars (Tuning.h); with them up,
-// X steps through debug views that switch parts of the scene off.
-//
 
 #include "stdafx.h"
 #include "Screen.h"
 #include "Post.h"
 #include "Backdrop.h"
 #include "Orb.h"
-#include "Tuning.h"
 #include "Ring.h"
 #include "Hud.h"
 #include "Library.h"
@@ -64,15 +60,6 @@ float      g_fCamZ    = 8.2f;     // eases between the two (damp 4)
 float      g_fRingScale = 1.0f;   // ring tucks away while a shelf is open (damp 7)
 float      g_fOrbY    = 0.0f;     // orb floats up to 0.6 while a shelf is open (damp 5)
 float      g_fOpenIn  = -1.0f;    // seconds until the selected shelf opens; < 0 = none
-
-// Debug views, cycled with X while the tuning bars are showing: each switches one
-// part of the scene off, to find out what is drawing over what
-enum { VIEW_NORMAL, VIEW_NO_BLOOM, VIEW_NO_SHELL, VIEW_NO_NUCLEUS, VIEW_RING_NO_DEPTH, VIEW_NO_ORB, NUM_VIEWS };
-static const char* c_szViews[NUM_VIEWS] =
-{
-    "1 NORMAL", "2 NO BLOOM", "3 NO ORB GLOW (SHELL)", "4 NO ORB CORE (NUCLEUS)", "5 RING IGNORES DEPTH", "6 NO ORB AT ALL"
-};
-int g_nView = VIEW_NORMAL;
 
 // Buttons held on each pad last frame. Starts as "everything held" so a button still
 // down from whatever launched Orbit must be released before it counts.
@@ -340,11 +327,8 @@ static void ShowBusyCard()
 
 void UpdateMenu( const InputState& in, float dt )
 {
-    // While the tuning bars show, the D-pad and face buttons belong to them; while the
-    // library updates, nothing does
-    BOOL bTuning = Tuning_IsVisible();
-    BOOL bBusy = LibraryBusy();
-    BOOL bNoInput = bTuning || bBusy;
+    // While the library updates, the buttons do nothing
+    BOOL bNoInput = LibraryBusy();
     int nMove  = Repeat( bNoInput ? 0 : MenuDirection( in ), &g_fRepeat, dt );
     int nMoveY = Repeat( bNoInput ? 0 : MenuDirectionY( in ), &g_fRepeatY, dt );
     WORD wPressed = bNoInput ? 0 : in.wPressed;
@@ -446,12 +430,10 @@ void Render()
     // three.js order: background, opaque (nucleus), then transparent far to near
     Post_BeginScene( g_pd3dDevice );
     Backdrop_RenderBackground( g_pd3dDevice );
-    if( g_nView != VIEW_NO_NUCLEUS && g_nView != VIEW_NO_ORB )
-        Orb_RenderNucleus( g_pd3dDevice, matViewProj, g_Time.fOrbTime, g_fPulse, g_fOrbY );
+    Orb_RenderNucleus( g_pd3dDevice, matViewProj, g_Time.fOrbTime, g_fPulse, g_fOrbY );
     Ring_Render( g_pd3dDevice, matView, matProj, vEye, RING_BACK, fOrbDepth );
     Backdrop_RenderStars( g_pd3dDevice, matViewProj );
-    if( g_nView != VIEW_NO_SHELL && g_nView != VIEW_NO_ORB )
-        Orb_RenderShell( g_pd3dDevice, matViewProj, vEye, g_Time.fOrbTime, g_fPulse, g_fOrbY );
+    Orb_RenderShell( g_pd3dDevice, matViewProj, vEye, g_Time.fOrbTime, g_fPulse, g_fOrbY );
     Ring_Render( g_pd3dDevice, matView, matProj, vEye, RING_FRONT_TRACK, fOrbDepth );
     Post_EndFrame( g_pd3dDevice );
     Post_SetSceneDepth( g_pd3dDevice, TRUE );
@@ -463,16 +445,6 @@ void Render()
     Settings_Render( g_pd3dDevice );
 
     Hud_Render( g_pd3dDevice );
-    if( Tuning_IsVisible() )
-    {
-        float fBloom, fRed, fGamma;
-        Tuning_GetValues( &fBloom, &fRed, &fGamma );
-        char szDebug[128];
-        sprintf_s( szDebug, "BLOOM %.2f  RED %.2f  GAMMA %.2f\nVIEW %s  (X = NEXT)",
-                   fBloom, fRed, fGamma, c_szViews[g_nView] );
-        Hud_DrawDebug( g_pd3dDevice, szDebug );
-    }
-    Tuning_DrawOverlay( g_pd3dDevice );
     g_pd3dDevice->Present( NULL, NULL, NULL, NULL );
 }
 
@@ -497,7 +469,6 @@ void __cdecl main()
         ExitToDefaultApp();
     if( FAILED( Post_Init( g_pd3dDevice ) ) )
         ExitToDefaultApp();
-    Tuning_Init();
     if( FAILED( Backdrop_Init( g_pd3dDevice ) ) )
         ExitToDefaultApp();
     if( FAILED( Orb_Init( g_pd3dDevice ) ) )
@@ -527,16 +498,6 @@ void __cdecl main()
         PollInput( &in );
         // B goes back inside a view (the view handles it) and does nothing on the main
         // menu: Orbit is the default app now, so leaving to it would just restart Orbit
-        Tuning_Update( in.wPressed );
-        if( Tuning_IsVisible() && ( in.wPressed & XINPUT_GAMEPAD_X ) )
-            g_nView = ( g_nView + 1 ) % NUM_VIEWS;
-        if( g_nView == VIEW_NO_BLOOM )
-        {
-            float fBloom, fRed, fGamma;
-            Tuning_GetValues( &fBloom, &fRed, &fGamma );
-            Post_SetTrims( 0.0f, fRed, fGamma );
-        }
-        Ring_SetDepthTest( g_nView != VIEW_RING_NO_DEPTH );
         UpdateMenu( in, dt );
         Hud_Update( dt );
         g_fPulse = max( 0.0f, g_fPulse - dt * 2.5f );

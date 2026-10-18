@@ -8,7 +8,6 @@
 static const int RING_ITEMS = 6;
 
 HRESULT     Ring_Init( D3DDevice* pDevice );
-void        Ring_SetDepthTest( BOOL bEnable );    // debug view switch
 void        Ring_SetScale( float fScale );        // whole ring; tucks to 0.001 while a shelf is open
 void        Ring_Update( float dt, int nMove );   // nMove: -1, 0, +1
 int         Ring_GetIndex();

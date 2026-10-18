@@ -24,7 +24,8 @@ If something doesn't work on your setup, please [open an issue](../../issues).
   - **A** launch, **X** back cover, **Y** details (title, version, size, delete).
 - **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
 - **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste and delete. System folders are protected.
-- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items.
+- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items; pick a colour theme.
+- **Colour themes:** purple (the default), blue, green, orange or red.
 - **Sorting:** items go on the right shelf by what they are, not by which folder they're in.
 
 ## Requirements
@@ -148,6 +149,14 @@ If you don't use some parts of the menu (for example, you have no original Xbox 
 Hidden items disappear from the ring and the rest spread out to fill the gap. Nothing is deleted; switch an item back **ON** to bring it back. **SETTINGS** can't be hidden, so you can always get back to these switches, and at least one other item has to stay on.
 
 Your choices are saved in `menu.txt`, next to `Orbit.xex`.
+
+## Colour themes
+
+Open **SETTINGS**, go to **THEME** (under MENU) and press left or right to choose **PURPLE**, **BLUE**, **GREEN**, **ORANGE** or **RED**. The screen changes straight away.
+
+The theme colours the background, the orb, the menu, the windows and the text. Box art and the game case colours (black for original Xbox, green for 360, orange for Arcade) stay as they are.
+
+Your choice is saved in `theme.txt`, next to `Orbit.xex`.
 
 ## Box art
 

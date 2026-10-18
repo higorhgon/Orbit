@@ -352,37 +352,6 @@ static void SetHudStates( D3DDevice* pDevice, float vTrims[4] )
 }
 
 
-//-------------------------------------------------------------------------------------
-// Name: Hud_DrawDebug()
-//-------------------------------------------------------------------------------------
-void Hud_DrawDebug( D3DDevice* pDevice, const char* szText )
-{
-    if( !s_bMono )
-        return;
-    float vTrims[4];
-    SetHudStates( pDevice, vTrims );
-
-    const ScreenInfo& scr = g_Screen;
-    const float fPx = 9.0f * scr.Unit;
-    float y = scr.SafeRect.top + fPx * 3.0f;
-    char szLine[96];
-    const char* p = szText;
-    while( *p )
-    {
-        int n = 0;
-        while( *p && *p != '\n' && n < 95 )
-            szLine[n++] = *p++;
-        szLine[n] = 0;
-        if( *p == '\n' )
-            p++;
-        DrawText( pDevice, s_Mono, szLine, (float)scr.SafeRect.left, y, fPx, fPx * 0.1f, ION, NO_GLOW, 1.0f );
-        y += fPx * 1.6f;
-    }
-
-    pDevice->SetTexture( 0, NULL );
-    pDevice->SetRenderState( D3DRS_ALPHABLENDENABLE, FALSE );
-}
-
 
 //-------------------------------------------------------------------------------------
 // Drawing for views with their own panels (see Hud.h)
