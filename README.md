@@ -61,7 +61,7 @@ Video tutorials by MrMario2011:
 - [XeUnshackle Max for BadUpdate or ABadAvatar](https://youtu.be/P2hOdoLzQ38)
 - [Updating BadUpdate to 1.3](https://youtu.be/zADjXH8SFmI)
 
-**These guides set up Aurora as the dashboard.** Wherever they use Aurora, such as copying it to your drive or pointing `Default =` at it in `launch.ini`, use Orbit instead (see [Install](#install-new-users-or-making-orbit-your-dashboard)). You can still install Aurora alongside Orbit as a backup, on a button you hold at boot.
+**These guides set up Aurora as the dashboard.** Wherever they use Aurora, such as copying it to your drive or pointing `Default =` at it in `launch.ini`, use Orbit instead (see [Install](#install-new-users-or-making-orbit-your-dashboard)). You can still install Aurora alongside Orbit as a backup, on a button you hold at boot. Peer Pressure picks its dashboard differently, without `launch.ini`; see [Install with Peer Pressure](#install-with-peer-pressure).
 
 ## Install (new users, or making Orbit your dashboard)
 
@@ -83,6 +83,52 @@ Video tutorials by MrMario2011:
 4. Start the console, open **SETTINGS** in Orbit, add your content paths (see [Setting up your content paths](#setting-up-your-content-paths)) and **SCAN NOW**.
 
 If Orbit ever fails to start, it tries to open Aurora from `Usb0:\Apps\Aurora\Aurora.xex`, then the dashboard. Holding Y at boot (if your `launch.ini` points Y at the stock dashboard) is another way back.
+
+## Install with Peer Pressure
+
+[Peer Pressure](https://github.com/grimdoomer/Xbox360PeerPressure) doesn't use `launch.ini` for the dashboard. Instead, its installer copies the dashboard to the internal drive and boots it, set up through the installer's softmod extras.
+
+### Installing
+
+1. Follow the [Peer Pressure installation guide](https://github.com/grimdoomer/Xbox360PeerPressure/wiki/Installation) to set up your USB stick: extract `SoftmodInstaller.zip` and copy the `BadUpdatePayload` and `Content` folders to the root of the FAT32 USB stick.
+2. In `BadUpdatePayload\SoftmodExtras\` on the USB stick, make a folder called `Orbit` and put `Orbit.xex` and the `Media` folder inside it:
+   ```
+   BadUpdatePayload\
+     SoftmodExtras\
+       Orbit\
+         Orbit.xex
+         Media\
+       Xell\
+       SoftmodExtras.ini
+   ```
+3. Open `BadUpdatePayload\SoftmodExtras\SoftmodExtras.ini` in a text editor. Near the bottom is an Aurora example where every line starts with `;` (switched off). Remove the `;` from those 7 lines and change Aurora to Orbit, so they read:
+   ```ini
+   [Orbit]
+   Category = "Dashboards"
+   Name = "Orbit"
+   Description = "Installs Orbit dashboard."
+   Source = "Orbit"
+   Destination = "Hdd1:\PeerPressure\Dashboard"
+   DashXex = "Orbit.xex"
+   ```
+   `Source` must match the folder name from step 2, and `DashXex` the file name. `Dashboards` is only the heading the item is listed under in the installer, not a folder.
+4. Run the installer as the guide says. Tick **Install Extras** and select **Orbit**.
+5. The console now boots straight into Orbit. In the guide, **Orbit Home** brings you back to Orbit; **Xbox Home** always goes to the Microsoft dashboard.
+6. Open **SETTINGS** in Orbit, add your content paths (see [Setting up your content paths](#setting-up-your-content-paths)) and **SCAN NOW**.
+
+Orbit keeps its settings, game list and box art next to `Orbit.xex` (`paths.txt`, `library.txt`, `theme.txt`, `menu.txt` and `Covers`), so here they live in `Hdd1:\PeerPressure\Dashboard`. If you used Orbit elsewhere before, copy those files there to keep your setup.
+
+### Updating
+
+Orbit can't replace itself while it's running, and **FILES** won't delete anything in the `PeerPressure` folder, so update it with XexMenu:
+
+1. Put the new `Orbit.xex` on your USB stick. If the release changed `Media`, put the new `Media` folder on it too.
+2. Open XexMenu and go to `PeerPressure\Dashboard` on the internal drive.
+3. Delete the old `Orbit.xex` (and the old `Media` folder, if you're replacing it). Leave everything else in the folder: that's your settings, game list and box art.
+4. Copy the new `Orbit.xex` (and `Media`) from the USB stick into `PeerPressure\Dashboard`.
+5. Restart the console.
+
+Don't restart between steps 3 and 4: until the new copy is in place, there's no Orbit for the console to boot.
 
 ## Setting up your content paths
 

@@ -163,6 +163,7 @@ static const char* c_szProtected[] =
     "content\\0000000000000000\\5841122d",   // Rock Band Blitz, which launches it
     "launch.ini",                            // Dashlaunch settings
     "apps\\orbit",                           // Orbit itself
+    "peerpressure",                          // Hdd1: Peer Pressure softmod, and Orbit when it's the dashboard
     "compatibility",                         // Hdd1: original Xbox emulator
     "cache",                                 // Hdd1: system cache
     "$systemupdate",
@@ -256,41 +257,48 @@ static BOOL IsDirectory( const char* szPath, BOOL* pbExists )
     return *pbExists && ( a & FILE_ATTRIBUTE_DIRECTORY );
 }
 
-// Total bytes (bBytes) or items under szPath, the item itself included
-static ULONGLONG Measure( const char* szPath, BOOL bBytes )
+// Total bytes (bBytes) or items under szPath, the item itself included.
+// Sizes come from the directory listing itself (WIN32_FIND_DATA), so files are
+// never opened one by one. Opening each file made a folder with thousands of
+// files (e.g. Blinx's media folder) take minutes on FAT32, since every open
+// rescans the whole directory.
+static ULONGLONG MeasureDir( const char* szDir, BOOL bBytes )
 {
-    BOOL bExists;
-    if( !IsDirectory( szPath, &bExists ) )
-    {
-        if( !bBytes )
-            return 1;
-        HANDLE h = CreateFileA( szPath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL );
-        if( h == INVALID_HANDLE_VALUE )
-            return 0;
-        LARGE_INTEGER Size;
-        Size.QuadPart = 0;
-        GetFileSizeEx( h, &Size );
-        CloseHandle( h );
-        return (ULONGLONG)Size.QuadPart;
-    }
-
-    ULONGLONG qwTotal = bBytes ? 0 : 1;
+    ULONGLONG qwTotal = 0;
     char szFind[MAX_PATH], szChild[MAX_PATH];
-    JoinPath( szFind, sizeof(szFind), szPath, "*" );
+    JoinPath( szFind, sizeof(szFind), szDir, "*" );
     WIN32_FIND_DATAA fd;
     HANDLE hFind = FindFirstFileA( szFind, &fd );
     if( hFind == INVALID_HANDLE_VALUE )
-        return qwTotal;
+        return 0;
     do
     {
-        if( IsDots( fd.cFileName ) || s_bCancel )
+        if( IsDots( fd.cFileName ) )
             continue;
-        JoinPath( szChild, sizeof(szChild), szPath, fd.cFileName );
-        qwTotal += Measure( szChild, bBytes );
+        if( s_bCancel )
+            break;
+        if( fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+        {
+            JoinPath( szChild, sizeof(szChild), szDir, fd.cFileName );
+            qwTotal += ( bBytes ? 0 : 1 ) + MeasureDir( szChild, bBytes );
+        }
+        else
+            qwTotal += bBytes ? ( ( (ULONGLONG)fd.nFileSizeHigh << 32 ) | fd.nFileSizeLow ) : 1;
     }
     while( FindNextFileA( hFind, &fd ) );
     FindClose( hFind );
     return qwTotal;
+}
+
+static ULONGLONG Measure( const char* szPath, BOOL bBytes )
+{
+    // One lookup gives both the folder flag and the size
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    if( !GetFileAttributesExA( szPath, GetFileExInfoStandard, &fa ) )
+        return bBytes ? 0 : 1;   // as before: a missing item is one item with no bytes
+    if( fa.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+        return ( bBytes ? 0 : 1 ) + MeasureDir( szPath, bBytes );
+    return bBytes ? ( ( (ULONGLONG)fa.nFileSizeHigh << 32 ) | fa.nFileSizeLow ) : 1;
 }
 
 // Deletes szPath and everything in it. pqwDone counts items, for progress (may be NULL).
@@ -356,10 +364,14 @@ static const char* ErrorText( DWORD dwError, const char* szDefault )
 }
 
 // Copies szSrc to szDst (the new item's full path). Returns NULL or an error.
-static const char* CopyTree( const char* szSrc, const char* szDst, ULONGLONG* pqwDone )
+// nIsDir: 1 or 0 when the caller already knows from its directory listing,
+// -1 to look it up (saves a lookup per file in big folders).
+static const char* CopyTree( const char* szSrc, const char* szDst, ULONGLONG* pqwDone, int nIsDir = -1 )
 {
     BOOL bExists;
-    if( IsDirectory( szSrc, &bExists ) )
+    if( nIsDir < 0 )
+        nIsDir = IsDirectory( szSrc, &bExists ) ? 1 : 0;
+    if( nIsDir )
     {
         if( !CreateDirectoryA( szDst, NULL ) )
             return ErrorText( GetLastError(), "COULDN'T MAKE FOLDER" );
@@ -378,7 +390,7 @@ static const char* CopyTree( const char* szSrc, const char* szDst, ULONGLONG* pq
                 break;
             JoinPath( szFrom, sizeof(szFrom), szSrc, fd.cFileName );
             JoinPath( szTo, sizeof(szTo), szDst, fd.cFileName );
-            szErr = CopyTree( szFrom, szTo, pqwDone );
+            szErr = CopyTree( szFrom, szTo, pqwDone, ( fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) ? 1 : 0 );
         }
         while( !szErr && FindNextFileA( hFind, &fd ) );
         FindClose( hFind );

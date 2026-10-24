@@ -48,8 +48,8 @@ struct DirEntry
 BOOL  Drives_List( const char* szPath, DirEntry* pEntries, int nMax, int* pnCount );
 
 // Places Orbit refuses to delete: drive roots, the BadUpdate exploit (its payload
-// folder and Rock Band Blitz, which launches it), launch.ini, Orbit itself, and the
-// internal drive's system folders. Copying from them is fine.
+// folder and Rock Band Blitz, which launches it), launch.ini, Orbit itself, the
+// Peer Pressure folder, and the internal drive's system folders. Copying from them is fine.
 BOOL  Drives_IsProtected( const char* szPath );
 
 // Background jobs: one at a time
