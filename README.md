@@ -91,13 +91,14 @@ If Orbit ever fails to start, it tries to open Aurora from `Usb0:\Apps\Aurora\Au
 ### Installing
 
 1. Follow the [Peer Pressure installation guide](https://github.com/grimdoomer/Xbox360PeerPressure/wiki/Installation) to set up your USB stick: extract `SoftmodInstaller.zip` and copy the `BadUpdatePayload` and `Content` folders to the root of the FAT32 USB stick.
-2. In `BadUpdatePayload\SoftmodExtras\` on the USB stick, make a folder called `Orbit` and put `Orbit.xex` and the `Media` folder inside it:
+2. Copy the `Orbit` folder from the release zip (with `Orbit.xex`, `Media` and `Covers` inside) into `BadUpdatePayload\SoftmodExtras\` on the USB stick. If you already have box art, put it in `Covers` now and it's installed along with Orbit (see [Box art](#box-art)).
    ```
    BadUpdatePayload\
      SoftmodExtras\
        Orbit\
          Orbit.xex
          Media\
+         Covers\
        Xell\
        SoftmodExtras.ini
    ```
@@ -208,7 +209,7 @@ Your choice is saved in `theme.txt`, next to `Orbit.xex`.
 
 Box art is optional; games without it get a cover drawn for them.
 
-1. Find the `Covers` folder inside Orbit's own folder, for example `Usb0:\Apps\Orbit\Covers\` or `Hdd1:\Apps\Orbit\Covers\`. Orbit creates it the first time it starts, on whichever drive it runs from. (Covers in `Usb0:\Orbit\Covers\`, where versions before 0.9.1 looked, still work.)
+1. Find the `Covers` folder inside Orbit's own folder, for example `Usb0:\Apps\Orbit\Covers\` or `Hdd1:\Apps\Orbit\Covers\` (with Peer Pressure, `Hdd1:\PeerPressure\Dashboard\Covers\`). Orbit creates it the first time it starts, on whichever drive it runs from. (Covers in `Usb0:\Orbit\Covers\`, where versions before 0.9.1 looked, still work.)
 2. Put covers in it named by title ID, for example `4D5307E6.jpg` for Halo 3. A game's title ID is shown in its content folder name (`Content\0000000000000000\<TitleID>`) or on xboxunity.net.
 3. Run **SCAN NOW** in SETTINGS, or restart Orbit, to load them.
 
