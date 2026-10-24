@@ -121,7 +121,7 @@ Orbit keeps its settings, game list and box art next to `Orbit.xex` (`paths.txt`
 
 ### Updating
 
-Orbit can't replace itself while it's running, and **FILES** won't delete anything in the `PeerPressure` folder, so update it with XexMenu:
+Orbit can't replace itself while it's running, and **FILES** won't delete anything in the `PeerPressure` folder, so update it with [XexMenu](https://consolemods.org/wiki/Xbox_360:XeXmenu):
 
 1. Put the new `Orbit.xex` on your USB stick. If the release changed `Media`, put the new `Media` folder on it too.
 2. Open XexMenu and go to `PeerPressure\Dashboard` on the internal drive.
