@@ -18,6 +18,7 @@
 #include "Assets.h"
 #include "Hud.h"
 #include "Drives.h"
+#include "Profile.h"
 #include "Files.h"
 
 static const int MAX_ENTRIES = 1024;
@@ -37,6 +38,20 @@ static char      s_szClip[MAX_PATH] = "";             // clipboard: full path
 static BOOL      s_bConfirm = FALSE;                  // X pressed once on s_szConfirm
 static char      s_szConfirm[MAX_PATH];
 static BOOL      s_bJobSeen = FALSE;                  // a job we started is running
+
+// Typing a name (rename / new folder) on the system keyboard, after the sign-in screen
+// if the keyboard wants a profile. The list takes no input until it's done.
+enum { TYPE_NONE, TYPE_SIGNIN, TYPE_KEYBOARD };
+enum { NAME_RENAME, NAME_NEW_FOLDER };
+static const int   MAX_NAME = 128;                    // a list row's name (DirEntry::szName)
+static int         s_nTyping   = TYPE_NONE;
+static int         s_nNameFor  = NAME_RENAME;
+static char        s_szRenaming[MAX_PATH];            // rename: the item's full path
+static BOOL        s_bSawSignIn = FALSE;              // the sign-in screen has come up
+static float       s_fSignInWait = 0.0f;              // seconds since asking for it
+static WCHAR       s_wszDefault[MAX_NAME];
+static WCHAR       s_wszTyped[MAX_NAME];
+static XOVERLAPPED s_Keyboard;
 
 static D3DTexture* s_pWin   = NULL;
 static SpriteInfo  s_WinInfo;
@@ -135,15 +150,168 @@ static void UpdateKeys()
     static const HudKey c_Keys[] =
     {
         { HUD_POD_NONE, "\x01 \x02 CHANGE DRIVES" }, { HUD_POD_NONE, "\x04 \x05 NAVIGATE DRIVE" },
-        { HUD_POD_A, "OPEN" }, { HUD_POD_X, "DELETE" }, { HUD_POD_Y, "COPY" }, { HUD_POD_B, "BACK" },
+        { HUD_POD_A, "OPEN" }, { HUD_POD_X, "DELETE" }, { HUD_POD_Y, "COPY" },
+        { HUD_POD_LB, "RENAME" }, { HUD_POD_LT, "NEW FOLDER" }, { HUD_POD_B, "BACK" },
     };
     static const HudKey c_KeysPaste[] =
     {
         { HUD_POD_NONE, "\x01 \x02 CHANGE DRIVES" }, { HUD_POD_NONE, "\x04 \x05 NAVIGATE DRIVE" },
-        { HUD_POD_A, "OPEN" }, { HUD_POD_X, "DELETE" }, { HUD_POD_Y, "COPY" }, { HUD_POD_RB, "PASTE" }, { HUD_POD_B, "BACK" },
+        { HUD_POD_A, "OPEN" }, { HUD_POD_X, "DELETE" }, { HUD_POD_Y, "COPY" }, { HUD_POD_RB, "PASTE" },
+        { HUD_POD_LB, "RENAME" }, { HUD_POD_LT, "NEW FOLDER" }, { HUD_POD_B, "BACK" },
     };
     if( s_szClip[0] ) Hud_SetKeys( c_KeysPaste, ARRAYSIZE( c_KeysPaste ) );
     else              Hud_SetKeys( c_Keys, ARRAYSIZE( c_Keys ) );
+}
+
+// Puts the selection on the row named szName, if it's there
+static void SelectName( const char* szName )
+{
+    for( int r = 0; r < RowCount(); r++ )
+    {
+        const DirEntry* re = RowEntry( r );
+        if( re && _stricmp( re->szName, szName ) == 0 ) { s_nRow = r; break; }
+    }
+}
+
+
+//-------------------------------------------------------------------------------------
+// Typing a name
+//-------------------------------------------------------------------------------------
+static BOOL OpenKeyboard()
+{
+    int nUser = Profile_SignedInUser();
+    ZeroMemory( &s_Keyboard, sizeof(s_Keyboard) );
+    s_wszTyped[0] = 0;
+    DWORD dw = XShowKeyboardUI( nUser >= 0 ? nUser : 0, VKBD_LATIN_FULL, s_wszDefault,
+                                s_nNameFor == NAME_RENAME ? L"Rename" : L"New Folder",
+                                s_nNameFor == NAME_RENAME ? L"Type the new name." : L"Type a name for the new folder.",
+                                s_wszTyped, MAX_NAME, &s_Keyboard );
+    if( dw != ERROR_IO_PENDING )
+        return FALSE;
+    s_nTyping = TYPE_KEYBOARD;
+    return TRUE;
+}
+
+// Opens the keyboard starting from szDefault; if it wants a profile and nobody is
+// signed in, the sign-in screen first
+static void StartTyping( int nNameFor, const char* szDefault )
+{
+    s_nNameFor = nNameFor;
+    int i = 0;
+    for( ; szDefault[i] && i < MAX_NAME - 1; i++ )
+        s_wszDefault[i] = (WCHAR)(unsigned char)szDefault[i];
+    s_wszDefault[i] = 0;
+
+    if( OpenKeyboard() )
+        return;
+    if( Profile_SignedInUser() < 0 && Profile_ShowSignIn() )
+    {
+        s_nTyping = TYPE_SIGNIN;
+        s_bSawSignIn = FALSE;
+        s_fSignInWait = 0.0f;
+        return;
+    }
+    Toast( "COULDN'T OPEN THE KEYBOARD", 2.2f );
+}
+
+static void Cancelled()
+{
+    Toast( s_nNameFor == NAME_RENAME ? "RENAME CANCELLED" : "NEW FOLDER CANCELLED" );
+}
+
+// The keyboard's text: plain characters only, spaces trimmed from both ends
+static BOOL TypedName( char* szOut, size_t nOut )
+{
+    const WCHAR* p = s_wszTyped;
+    while( *p == L' ' ) p++;
+    size_t n = 0;
+    for( ; *p && n + 1 < nOut; p++ )
+    {
+        if( *p < 0x20 || *p > 0x7E )
+            return FALSE;
+        szOut[n++] = (char)*p;
+    }
+    while( n && szOut[n - 1] == ' ' ) n--;
+    szOut[n] = 0;
+    return TRUE;
+}
+
+// After the keyboard: rename the item or make the folder
+static void FinishTyping()
+{
+    char szName[MAX_NAME], szWhy[64], sz[192];
+    if( !TypedName( szName, sizeof(szName) ) )
+    {
+        Toast( "NAME HAS A CHARACTER DRIVES DON'T ALLOW", 2.2f );
+        return;
+    }
+
+    if( s_nNameFor == NAME_RENAME )
+    {
+        char szNew[MAX_PATH];
+        if( !Drives_Rename( s_szRenaming, szName, szNew, sizeof(szNew), szWhy, sizeof(szWhy) ) )
+        {
+            sprintf_s( sz, "CAN'T RENAME: %s", szWhy );
+            Toast( sz, 2.2f );
+            return;
+        }
+        // The clipboard follows the item (or anything inside a renamed folder)
+        size_t n = strlen( s_szRenaming );
+        if( _strnicmp( s_szClip, s_szRenaming, n ) == 0 && ( s_szClip[n] == 0 || s_szClip[n] == '\\' ) )
+        {
+            char szClip[MAX_PATH];
+            sprintf_s( szClip, "%s%s", szNew, s_szClip + n );
+            strcpy_s( s_szClip, szClip );
+        }
+        sprintf_s( sz, "RENAMED TO %s", szName );
+    }
+    else
+    {
+        if( !Drives_NewFolder( s_szPath[s_nDrive], szName, szWhy, sizeof(szWhy) ) )
+        {
+            sprintf_s( sz, "CAN'T MAKE FOLDER: %s", szWhy );
+            Toast( sz, 2.2f );
+            return;
+        }
+        sprintf_s( sz, "MADE FOLDER %s", szName );
+    }
+    Toast( sz, 2.2f );
+    Reload();
+    SelectName( szName );
+}
+
+// While typing: waits for the sign-in screen, then the keyboard
+static void UpdateTyping( float dt )
+{
+    if( s_nTyping == TYPE_SIGNIN )
+    {
+        BOOL bUI = Profile_IsSystemUIOpen();
+        s_bSawSignIn |= bUI;
+        s_fSignInWait += dt;
+        if( bUI )
+            return;
+        if( Profile_SignedInUser() >= 0 )
+        {
+            s_nTyping = TYPE_NONE;
+            if( !OpenKeyboard() )
+                Toast( "COULDN'T OPEN THE KEYBOARD", 2.2f );
+        }
+        else if( s_bSawSignIn || s_fSignInWait > 3.0f )
+        {
+            // Backed out of the sign-in screen (or it never came up)
+            s_nTyping = TYPE_NONE;
+            Cancelled();
+        }
+        return;
+    }
+
+    if( !XHasOverlappedIoCompleted( &s_Keyboard ) )
+        return;
+    s_nTyping = TYPE_NONE;
+    if( XGetOverlappedResult( &s_Keyboard, NULL, FALSE ) == ERROR_SUCCESS )
+        FinishTyping();
+    else
+        Cancelled();
 }
 
 
@@ -200,6 +368,13 @@ void Files_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
 {
     if( !s_bOpen )
         return;
+
+    // The sign-in screen or keyboard is up: nothing else until it's done
+    if( s_nTyping != TYPE_NONE )
+    {
+        UpdateTyping( dt );
+        return;
+    }
 
     // A background job: watch it finish; B cancels
     JobStatus Job;
@@ -309,11 +484,7 @@ void Files_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
         char* p = strrchr( szCur, '\\' );
         if( p ) p[1] = 0;
         Reload();
-        for( int r = 0; r < RowCount(); r++ )
-        {
-            const DirEntry* re = RowEntry( r );
-            if( re && _stricmp( re->szName, szLeft ) == 0 ) { s_nRow = r; break; }
-        }
+        SelectName( szLeft );
     }
 
     if( ( wPressed & XINPUT_GAMEPAD_Y ) && e )
@@ -371,6 +542,23 @@ void Files_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
             }
         }
     }
+
+    if( ( wPressed & XINPUT_GAMEPAD_LEFT_SHOULDER ) && e )
+    {
+        RowPath( s_nRow, szPath, sizeof(szPath) );
+        if( Drives_IsProtected( szPath ) )
+        {
+            Toast( "PROTECTED - ORBIT WON'T RENAME THIS", 2.2f );
+        }
+        else
+        {
+            strcpy_s( s_szRenaming, szPath );
+            StartTyping( NAME_RENAME, e->szName );
+        }
+    }
+
+    if( wPressed & PAD_LEFT_TRIGGER )
+        StartTyping( NAME_NEW_FOLDER, "New Folder" );
 
     // Keep the selection on screen
     if( s_nRow < s_nTop ) s_nTop = s_nRow;

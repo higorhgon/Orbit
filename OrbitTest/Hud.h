@@ -1,7 +1,7 @@
 // Orbit, an Xbox 360 homebrew launcher. Copyright (c) 2026 Noah Colbourne.
 // Licensed under the GNU General Public License v3.0 or later; see LICENSE.
 
-// Hud.h : top bar (ORBIT LAUNCHER + clock), bottom bar (menu name + button hints),
+// Hud.h : top bar (ORBIT LAUNCHER, profile badge, clock), bottom bar (menu name + button hints),
 // the details card and the toast (a short message above the bottom bar), laid out in
 // the prototype's --u units (see Hud.cpp).
 
@@ -13,7 +13,7 @@ void    Hud_ShowToast( const char* szText, float fSeconds );
 
 // Bottom bar key hints, right aligned: each is a button pod (or none) and a label.
 // The main menu's set is the default; a view swaps in its own while it is open.
-enum { HUD_POD_NONE = -1, HUD_POD_A, HUD_POD_B, HUD_POD_X, HUD_POD_Y, HUD_POD_RB };
+enum { HUD_POD_NONE = -1, HUD_POD_A, HUD_POD_B, HUD_POD_X, HUD_POD_Y, HUD_POD_RB, HUD_POD_LB, HUD_POD_LT };
 struct HudKey
 {
     int         nPod;
@@ -21,6 +21,11 @@ struct HudKey
 };
 void    Hud_SetKeys( const HudKey* pKeys, int nKeys );
 void    Hud_SetMainKeys();
+
+// Profile badge in the top bar's middle: gamer picture in a frame, gamertag beside it.
+// szName NULL or "" hides it; pPicture NULL shows the frame empty. The name is copied;
+// the picture is drawn as is (Profile.cpp owns it).
+void    Hud_SetProfile( const char* szName, D3DTexture* pPicture );
 
 // Bottom bar menu name on the left (the prototype's .now); NULL or "" = none
 void    Hud_SetMenuName( const char* szName );

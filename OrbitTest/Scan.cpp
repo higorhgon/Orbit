@@ -152,18 +152,25 @@ static ScanItem* NewItem( int nShelf, const char* szLaunch )
     return p;
 }
 
-// Keeps the item unless its shelf already has one by that title (an app installed both
-// as a folder and as a package shows once)
+// Keeps the item unless its shelf already has the same thing: same title and same title
+// ID (an app installed both as a folder and as a package shows once). Different games
+// that happen to share a title both stay. Without a title ID to compare, the title decides.
 static void Commit()
 {
     const ScanItem& p = s_Work[s_nWork];
     for( int i = 0; i < s_nWork; i++ )
-        if( s_Work[i].nShelf == p.nShelf && _stricmp( s_Work[i].szTitle, p.szTitle ) == 0 )
+    {
+        const ScanItem& q = s_Work[i];
+        if( q.nShelf != p.nShelf || _stricmp( q.szTitle, p.szTitle ) != 0 )
+            continue;
+        if( !q.szTitleId[0] || !p.szTitleId[0] || _stricmp( q.szTitleId, p.szTitleId ) == 0 )
             return;
+    }
     s_nWork++;
 }
 
-// Folder with default.xbe: title, title ID and version from the XBE certificate
+// Folder with default.xbe: the folder names it (certificate titles can be "CDX" or
+// "SONICHEROES"); title ID and version from the XBE certificate
 static void AddXbe( const char* szDir )
 {
     char szXbe[MAX_PATH];
@@ -180,10 +187,6 @@ static void AddXbe( const char* szDir )
         DWORD dwBase = LE32( Head + 0x104 ), dwCert = LE32( Head + 0x118 );
         if( dwCert > dwBase && ReadHead( szXbe, Cert, sizeof(Cert), dwCert - dwBase ) )
         {
-            char szTitle[64];
-            WideToAscii( Cert + 0x0C, 40, FALSE, szTitle, sizeof(szTitle) );
-            if( szTitle[0] )
-                strcpy_s( p->szTitle, szTitle );
             sprintf_s( p->szVersion, "%u", LE32( Cert + 0xAC ) );
             sprintf_s( p->szTitleId, "%08X", LE32( Cert + 0x08 ) );
         }

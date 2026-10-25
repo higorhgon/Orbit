@@ -73,3 +73,11 @@ void  Drives_CancelJob();
 void  Drives_GetJob( JobStatus* pStatus );
 // Clears a finished job so the next can start
 void  Drives_ClearJob();
+
+// Renames szPath (file or folder) to szNewName in the same folder; szNewPath gets its
+// new full path. Refuses protected places, names drives don't allow, a name that's
+// taken, and while a job runs.
+BOOL  Drives_Rename( const char* szPath, const char* szNewName, char* szNewPath, int nNewPath,
+                     char* szWhyNot, int nWhyNot );
+// Makes the folder szName inside szDir
+BOOL  Drives_NewFolder( const char* szDir, const char* szName, char* szWhyNot, int nWhyNot );

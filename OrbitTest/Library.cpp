@@ -21,9 +21,11 @@
 // Orbit.xex (game:\Covers\<title ID>.jpg or .png), or from Usb0:\Orbit\Covers\, where
 // versions before 0.9.1 looked. A full box scan (back | spine | front side by side, XboxUnity's
 // 900 x 600 layout) wraps the whole case and gives it a back cover; a portrait image
-// is just the front. Without art, a cover is made here on the console: a baked
-// template (one of six hues, picked from the title) with the title written on it,
-// rendered to a 256 x 352 texture a couple per frame as they come into view.
+// is just the front. Decoding an image is slow, so the first load saves the result in
+// a Cache folder beside it and later boots copy that in instead. Without art, a cover
+// is made here on the console: a baked template (one of six hues, picked from the
+// title) with the title written on it, rendered to a 256 x 352 texture a couple per
+// frame as they come into view.
 //
 // Unlike the prototype the cases draw after bloom (as the front menu panels do), so
 // the orb's glow never washes over them.
@@ -32,6 +34,7 @@
 #include "stdafx.h"
 #include <ctype.h>
 #include <d3dx9tex.h>
+#include <xgraphics.h>
 #include "Screen.h"
 #include "Assets.h"
 #include "Post.h"
@@ -378,8 +381,148 @@ static void ReleaseCovers()
         }
 }
 
-// Box art for an item from the covers folder, compressed to DXT1 with mips. A wide
-// image (a box scan) wraps the case; a tall one is the front.
+// Box art cache: Covers\Cache\<title ID>.dxt beside the image, holding the texture
+// D3DX made from it so later boots skip the decode. Big-endian, the 360's order:
+//
+//   "OCV1", image size, image time (low, high), width, height, levels, then each
+//   level's DXT1 blocks untiled, row after row
+//
+// The image's size and time are kept so a replaced image is decoded again. Only the
+// levels above the packed mip tail are made (the smallest ones share one tile and
+// can't be copied level by level); a case on screen never gets that small.
+static const DWORD CACHE_HEADER = 7 * 4;
+static const DWORD MAX_CACHE    = 16 * 1024 * 1024;
+
+struct ArtStamp { DWORD dwSize, dwTimeLo, dwTimeHi; };
+
+// Mip levels a cover gets: all of them down to the packed tail (0 = the image is that small)
+static UINT ArtLevels( UINT w, UINT h )
+{
+    return XGGetMipTailBaseLevel( w, h, FALSE );
+}
+
+// Bytes of one level's untiled DXT1 blocks (8 bytes per 4 x 4 block)
+static UINT LevelBytes( UINT w0, UINT h0, UINT lv, UINT* pnPitch )
+{
+    UINT w = max( 1u, w0 >> lv ), h = max( 1u, h0 >> lv );
+    *pnPitch = ( ( w + 3 ) / 4 ) * 8;
+    return *pnPitch * ( ( h + 3 ) / 4 );
+}
+
+static D3DTexture* LoadCachedArt( D3DDevice* pDevice, const char* szCache, const ArtStamp& Stamp )
+{
+    HANDLE hFile = CreateFile( szCache, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, NULL );
+    if( hFile == INVALID_HANDLE_VALUE )
+        return NULL;
+    DWORD dwSize = GetFileSize( hFile, NULL );
+    BYTE* pData = NULL;
+    if( dwSize != INVALID_FILE_SIZE && dwSize > CACHE_HEADER && dwSize <= MAX_CACHE )
+    {
+        pData = new BYTE[dwSize];
+        DWORD dwRead = 0;
+        if( !ReadFile( hFile, pData, dwSize, &dwRead, NULL ) || dwRead != dwSize )
+        {
+            delete[] pData;
+            pData = NULL;
+        }
+    }
+    CloseHandle( hFile );
+    if( !pData )
+        return NULL;
+
+    // The header's values after the magic (memcpy: no alignment assumed)
+    DWORD v[6];
+    memcpy( v, pData + 4, sizeof(v) );
+    const UINT w0 = v[3], h0 = v[4], nLevels = v[5];
+    BOOL bOK = memcmp( pData, "OCV1", 4 ) == 0 &&
+               v[0] == Stamp.dwSize && v[1] == Stamp.dwTimeLo && v[2] == Stamp.dwTimeHi &&
+               w0 > 0 && h0 > 0 && w0 <= 4096 && h0 <= 4096 && nLevels > 0 && nLevels == ArtLevels( w0, h0 );
+    DWORD dwNeed = CACHE_HEADER;
+    UINT nPitch;
+    for( UINT lv = 0; bOK && lv < nLevels; lv++ )
+        dwNeed += LevelBytes( w0, h0, lv, &nPitch );
+
+    D3DTexture* pTex = NULL;
+    if( bOK && ( dwNeed != dwSize ||
+                 FAILED( pDevice->CreateTexture( w0, h0, nLevels, 0, D3DFMT_DXT1, D3DPOOL_MANAGED, &pTex, NULL ) ) ) )
+        bOK = FALSE;
+
+    const BYTE* p = pData + CACHE_HEADER;
+    for( UINT lv = 0; bOK && lv < nLevels; lv++ )
+    {
+        UINT nBytes = LevelBytes( w0, h0, lv, &nPitch );
+        D3DLOCKED_RECT Locked;
+        if( FAILED( pTex->LockRect( lv, &Locked, NULL, 0 ) ) )
+        {
+            bOK = FALSE;
+            break;
+        }
+        XGTileTextureLevel( w0, h0, lv, XGGetGpuFormat( D3DFMT_DXT1 ), 0, Locked.pBits, NULL, p, nPitch, NULL );
+        pTex->UnlockRect( lv );
+        p += nBytes;
+    }
+
+    delete[] pData;
+    if( !bOK && pTex )
+    {
+        pTex->Release();
+        pTex = NULL;
+    }
+    return pTex;
+}
+
+// Saves a texture D3DX just made into the cache (szDir is the covers folder)
+static void SaveCachedArt( const char* szDir, const char* szCache, const ArtStamp& Stamp, D3DTexture* pTex )
+{
+    D3DSURFACE_DESC Desc;
+    pTex->GetLevelDesc( 0, &Desc );
+    const UINT w0 = Desc.Width, h0 = Desc.Height, nLevels = pTex->GetLevelCount();
+    if( Desc.Format != D3DFMT_DXT1 || nLevels == 0 || nLevels != ArtLevels( w0, h0 ) )
+        return;
+
+    DWORD dwSize = CACHE_HEADER;
+    UINT nPitch;
+    for( UINT lv = 0; lv < nLevels; lv++ )
+        dwSize += LevelBytes( w0, h0, lv, &nPitch );
+    if( dwSize > MAX_CACHE )
+        return;
+
+    BYTE* pData = new BYTE[dwSize];
+    const DWORD v[6] = { Stamp.dwSize, Stamp.dwTimeLo, Stamp.dwTimeHi, w0, h0, nLevels };
+    memcpy( pData, "OCV1", 4 );
+    memcpy( pData + 4, v, sizeof(v) );
+    BYTE* p = pData + CACHE_HEADER;
+    for( UINT lv = 0; lv < nLevels; lv++ )
+    {
+        UINT nBytes = LevelBytes( w0, h0, lv, &nPitch );
+        D3DLOCKED_RECT Locked;
+        if( FAILED( pTex->LockRect( lv, &Locked, NULL, D3DLOCK_READONLY ) ) )
+        {
+            delete[] pData;
+            return;
+        }
+        XGUntileTextureLevel( w0, h0, lv, XGGetGpuFormat( D3DFMT_DXT1 ), 0, p, nPitch, NULL, Locked.pBits, NULL );
+        pTex->UnlockRect( lv );
+        p += nBytes;
+    }
+
+    // A half-written file (the console turned off) is the wrong size, so it's never used
+    char szCacheDir[MAX_PATH];
+    sprintf_s( szCacheDir, "%sCache", szDir );
+    CreateDirectory( szCacheDir, NULL );
+    HANDLE hFile = CreateFile( szCache, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+    if( hFile != INVALID_HANDLE_VALUE )
+    {
+        DWORD dwWritten;
+        WriteFile( hFile, pData, dwSize, &dwWritten, NULL );
+        CloseHandle( hFile );
+    }
+    delete[] pData;
+}
+
+// Box art for an item from the covers folder, compressed to DXT1 with mips (from the
+// cache when it's there). A wide image (a box scan) wraps the case; a tall one is the front.
 static void LoadArt( D3DDevice* pDevice, int nShelf, int i )
 {
     s_Art[nShelf][i] = ART_NONE;
@@ -392,12 +535,27 @@ static void LoadArt( D3DDevice* pDevice, int nShelf, int i )
         {
             char szPath[MAX_PATH];
             sprintf_s( szPath, "%s%s.%s", c_szCoverDirs[d], it.szTitleId, c_szExt[e] );
-            if( GetFileAttributesA( szPath ) == (DWORD)-1 )
+            WIN32_FILE_ATTRIBUTE_DATA Attr;
+            if( !GetFileAttributesExA( szPath, GetFileExInfoStandard, &Attr ) )
                 continue;
-            D3DTexture* pTex = NULL;
-            if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT,
-                                                      0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
-                continue;
+            const ArtStamp Stamp = { Attr.nFileSizeLow, Attr.ftLastWriteTime.dwLowDateTime,
+                                     Attr.ftLastWriteTime.dwHighDateTime };
+            char szCache[MAX_PATH];
+            sprintf_s( szCache, "%sCache\\%s.dxt", c_szCoverDirs[d], it.szTitleId );
+
+            D3DTexture* pTex = LoadCachedArt( pDevice, szCache, Stamp );
+            if( !pTex )
+            {
+                // Levels down to the packed tail, so the result can be cached
+                D3DXIMAGE_INFO Info;
+                UINT nLevels = D3DX_DEFAULT;
+                if( SUCCEEDED( D3DXGetImageInfoFromFileA( szPath, &Info ) ) && ArtLevels( Info.Width, Info.Height ) > 0 )
+                    nLevels = ArtLevels( Info.Width, Info.Height );
+                if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, nLevels,
+                                                          0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
+                    continue;
+                SaveCachedArt( c_szCoverDirs[d], szCache, Stamp, pTex );
+            }
             D3DSURFACE_DESC Desc;
             pTex->GetLevelDesc( 0, &Desc );
             s_pArt[nShelf][i] = pTex;

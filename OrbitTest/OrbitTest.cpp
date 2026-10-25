@@ -29,6 +29,7 @@
 #include "Settings.h"
 #include "Sound.h"
 #include "Scan.h"
+#include "Profile.h"
 
 //-------------------------------------------------------------------------------------
 // Constants from the prototype
@@ -230,6 +231,8 @@ void PollInput( InputState* pIn )
         }
 
         WORD wButtons = State.Gamepad.wButtons;
+        if( State.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD )
+            wButtons |= PAD_LEFT_TRIGGER;   // LT pulled counts as a button
         pIn->wPressed |= wButtons & ~g_wPrevButtons[i];
         // A held button only counts once it has been seen released
         g_wArmed[i] |= (WORD)~wButtons;
@@ -340,7 +343,9 @@ void UpdateMenu( const InputState& in, float dt )
         Sound_Play( SOUND_BACK );
     else if( wPressed & ( XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_Y ) )
         Sound_Play( SOUND_SELECT );
-    else if( nMove || ( nMoveY && bList ) || ( wPressed & ( XINPUT_GAMEPAD_X | XINPUT_GAMEPAD_RIGHT_SHOULDER ) ) )
+    else if( nMove || ( nMoveY && bList ) ||
+             ( wPressed & ( XINPUT_GAMEPAD_X | XINPUT_GAMEPAD_RIGHT_SHOULDER ) ) ||
+             ( Files_IsOpen() && ( wPressed & ( XINPUT_GAMEPAD_LEFT_SHOULDER | PAD_LEFT_TRIGGER ) ) ) )
         Sound_Play( SOUND_MOVE );
 
     // A finished scan refills the shelves
@@ -484,6 +489,7 @@ void __cdecl main()
         ExitToDefaultApp();
     if( FAILED( Settings_Init( g_pd3dDevice ) ) )
         ExitToDefaultApp();
+    Profile_Init( g_pd3dDevice );                  // the top bar's profile badge
     Sound_Init();                                  // the hum fades in while the rest loads
     Scan_Init();                                   // saved library, or a first scan
     Library_PreloadCovers( g_pd3dDevice );         // all box art now, so shelves open without a hitch
@@ -493,6 +499,8 @@ void __cdecl main()
     for(;;)
     {
         float dt = UpdateTime();
+
+        Profile_Update( g_pd3dDevice );
 
         InputState in;
         PollInput( &in );

@@ -23,7 +23,8 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 - **Shelves:** 3D game cases (black for original Xbox, green for 360, orange for Arcade) with your box art. Games without art get a cover drawn for them.
   - **A** launch, **X** back cover, **Y** details (title, version, size, delete).
 - **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
-- **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste and delete. System folders are protected.
+- **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste, delete, rename (**LB**) and make new folders (**LT**). Names are typed on the console's own keyboard; if it asks for a profile, the sign-in screen comes up first. System folders are protected.
+- **Profile:** the signed-in profile's gamer picture and gamertag sit in the middle of the top bar (hidden when nobody is signed in).
 - **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items; pick a colour theme.
 - **Colour themes:** purple (the default), blue, green, orange or red.
 - **Sorting:** items go on the right shelf by what they are, not by which folder they're in.
@@ -162,7 +163,7 @@ Depth is how many folder levels Orbit looks down from the path. It stops going d
 |---|---|---|
 | `Hdd1:\Apps` | **2** | Homebrew apps, one folder each, e.g. `Hdd1:\Apps\Simple 360 NAND Flasher\default.xex`. Fills the APPS shelf. The folder must be named **Apps**. |
 | `Hdd1:\Content\0000000000000000` | **3** | Installed content: GOD packages, Arcade games and app packages. Fills the XBOX 360, ARCADE and APPS shelves. |
-| `Hdd1:\OG_Xbox` | **2** | Original Xbox games, one folder each with a `default.xbe`, e.g. `Hdd1:\OG_Xbox\Halo\default.xbe`. Fills the XBOX shelf. The folder name is up to you. |
+| `Hdd1:\OG_Xbox` | **2** | Original Xbox games, one folder each with a `default.xbe`, e.g. `Hdd1:\OG_Xbox\Halo\default.xbe`. Fills the XBOX shelf. The folder name is up to you, and it's the name the game shows on the shelf (rename it in FILES, then **SCAN NOW**). |
 | `Hdd1:\Games` | **2** | Xbox 360 game rips, e.g. `Hdd1:\Games\<Game>\default.xex`. Fills the XBOX 360 shelf. *Not tested yet.* |
 
 ### Example: games on a USB drive
@@ -214,6 +215,8 @@ Box art is optional; games without it get a cover drawn for them.
 3. Run **SCAN NOW** in SETTINGS, or restart Orbit, to load them.
 
 Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
+
+The first time Orbit loads a cover it saves a ready-to-draw copy in `Covers\Cache\`, so later starts are much quicker. Replacing a cover image is picked up automatically. The `Cache` folder is safe to delete; Orbit rebuilds it on the next start.
 
 ## Title updates and DLC
 
