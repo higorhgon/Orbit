@@ -144,7 +144,7 @@ function podCanvas(letter) {
   // letter, done like the menu panels: glowing lilac outline underneath, solid ink on top
   x.save();
   x.translate(w / 2, h / 2); x.rotate(8 * Math.PI / 180);
-  // two-letter bumpers (RB) shrink to fit the pod's middle
+  // two-letter bumpers and triggers (RB, LB, LT) shrink to fit the pod's middle
   x.font = `900 ${(letter.length > 1 ? 8 : 11) * U}px Orbitron`; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.lineJoin = 'round';
   x.shadowColor = '#cc33ff'; x.shadowBlur = 4;
@@ -155,6 +155,42 @@ function podCanvas(letter) {
 
   // glow: the prototype's inner drop-shadow (0 0 4px rgba(204,51,255,.8)) only; its wider
   // 9px halo tinted the pods pink on the TV, where the menu panels have none
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const y1 = out.getContext('2d');
+  y1.shadowColor = 'rgba(204, 51, 255, 0.8)'; y1.shadowBlur = 4; y1.drawImage(body, 0, 0);
+  return { canvas: out, boxW: w, boxH: h, pad };
+}
+
+/* ---------- profile badge frame (not in the prototype; drawn like the pods, upright) ---------- */
+// The outer shape, as fractions of the square box. The hole is the same shape scaled to
+// PROFILE_HOLE about the centre; Profile.cpp cuts the gamer picture to this shape and
+// Hud.cpp draws it over the hole, so keep PROFILE_CUT in step with Profile.cpp's c_Cut.
+const PROFILE_CUT = [[0.20, 0], [0.82, 0], [1, 0.17], [1, 0.80], [0.82, 1], [0.22, 1], [0, 0.82], [0, 0.20]];
+const PROFILE_HOLE = 0.83;
+function profileFrameCanvas() {
+  const w = 26 * U, h = 26 * U, pad = 24;
+  const W = Math.ceil(w + pad * 2), H = Math.ceil(h + pad * 2);
+  const hole = PROFILE_CUT.map(p => [0.5 + (p[0] - 0.5) * PROFILE_HOLE, 0.5 + (p[1] - 0.5) * PROFILE_HOLE]);
+
+  const body = document.createElement('canvas'); body.width = W; body.height = H;
+  const x = body.getContext('2d');
+  x.translate(pad, pad);
+  // the pods' body in the hole, seen when there's no picture
+  {
+    const cx = w * 0.35, cy = h * 0.35, r = Math.hypot(w * 0.65, h * 0.65);
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, '#b300ff'); g.addColorStop(0.6, '#4a0080'); g.addColorStop(1, '#1a0033');
+    x.beginPath(); polyPct(x, hole, 0, 0, w, h); x.fillStyle = g; x.fill();
+  }
+  // the bevelled rim (outer shape minus the hole), with the pods' gradient and edges
+  x.beginPath(); polyPct(x, PROFILE_CUT, 0, 0, w, h); polyPct(x, hole, 0, 0, w, h);
+  x.fillStyle = cssLinear(x, 160, 0, 0, w, h, [[0, '#f2c8ff'], [0.45, '#cc33ff'], [1, '#6a1aa8']]);
+  x.fill('evenodd');
+  x.lineWidth = 0.5 * U;
+  x.beginPath(); polyPct(x, PROFILE_CUT, 0, 0, w, h); x.strokeStyle = 'rgba(255, 240, 255, 0.55)'; x.stroke();
+  x.beginPath(); polyPct(x, hole, 0, 0, w, h); x.strokeStyle = 'rgba(20, 0, 40, 0.6)'; x.stroke();
+
+  // the pods' glow
   const out = document.createElement('canvas'); out.width = W; out.height = H;
   const y1 = out.getContext('2d');
   y1.shadowColor = 'rgba(204, 51, 255, 0.8)'; y1.shadowBlur = 4; y1.drawImage(body, 0, 0);
@@ -499,10 +535,12 @@ async function bake() {
   ['Xbox', 'Xbox 360', 'Arcade', 'Apps', 'Files', 'Settings'].forEach((label, i) => {
     assets.textures['ring' + i] = { levels: mipChain(labelCanvas(label), 768, 256, 4) };
   });
-  ['A', 'B', 'X', 'Y', 'RB'].forEach(letter => {
+  ['A', 'B', 'X', 'Y', 'RB', 'LB', 'LT'].forEach(letter => {
     const p = podCanvas(letter);
     assets.textures['pod_' + letter.toLowerCase()] = { levels: [{ w: p.canvas.width, h: p.canvas.height, data: premulARGB(p.canvas) }], boxW: p.boxW, boxH: p.boxH, pad: p.pad };
   });
+  const pf = profileFrameCanvas();
+  assets.textures.profile_frame = { levels: [{ w: pf.canvas.width, h: pf.canvas.height, data: premulARGB(pf.canvas) }], boxW: pf.boxW, boxH: pf.boxH, pad: pf.pad };
   // .hud / .top text: Share Tech Mono 9u with the keys' 6px glow; Michroma for ORBIT, the menu name and the toast
   assets.fonts.mono = fontAtlas('"Share Tech Mono", "Segoe UI Symbol", monospace', 9 * U, 6);
   assets.fonts.display = fontAtlas('Michroma, "Segoe UI Symbol", sans-serif', 9 * U, 0);

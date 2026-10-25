@@ -12,7 +12,8 @@
 // A "toast" is the short message panel that pops up above the bottom bar.
 //
 //   .top   : "ORBIT" (Michroma, #b98aff) + " LAUNCHER" (Share Tech Mono, #9c84c9),
-//            clock on the right; 9u, letter-spacing 0.25em
+//            clock on the right; 9u, letter-spacing 0.25em. In the middle, the signed-in
+//            profile: gamer picture in a 26u frame, gamertag beside it (not in the prototype)
 //   .hud   : menu name (Michroma 9u, #b98aff, 0.3em) on the left; on the right the
 //            current view's key hints in #cdb3ff with a 6px #a066ff glow,
 //            0.22em spacing, 14u gaps, 30u x 22u pods with a 7u margin
@@ -36,7 +37,7 @@
 
 static const float ART_U = 1.5f;   // --u the art was baked at
 
-enum { POD_A, POD_B, POD_X, POD_Y, POD_RB, NUM_PODS };
+enum { POD_A, POD_B, POD_X, POD_Y, POD_RB, POD_LB, POD_LT, NUM_PODS };
 
 static D3DVertexShader*      s_pVS       = NULL;
 static D3DPixelShader*       s_pSpritePS = NULL;
@@ -64,9 +65,19 @@ static D3DTexture* s_pDim    = NULL;
 static D3DTexture* s_pToast[3] = { NULL, NULL, NULL };   // left cap, middle, right cap
 static SpriteInfo  s_ToastInfo;                           // BoxW = cap width, BoxH = box height
 
+// Profile badge: a 26u square frame (bake.html's profileFrameCanvas), small enough to
+// clear a shelf's title card. Its hole is the frame's shape at 83% (PROFILE_HOLE), so
+// the picture (already cut to that shape) fills the box inset by 8.5% on each side.
+static const float PROFILE_BOX_U     = 26.0f;
+static const float PROFILE_PIC_INSET = ( 1.0f - 0.83f ) * 0.5f;
+static D3DTexture* s_pProfileFrame = NULL;
+static SpriteInfo  s_ProfileInfo;
+static D3DTexture* s_pProfilePic   = NULL;
+static char        s_szProfile[XUSER_NAME_SIZE] = "";
+
 // Bottom bar keys. The main menu shows no (B) BACK: B does nothing there.
 static const HudKey c_MainKeys[] = { { HUD_POD_NONE, "\x01 \x02 MOVE" }, { HUD_POD_A, "SELECT" } };
-static const int    MAX_KEYS = 8;
+static const int    MAX_KEYS = 10;
 static HudKey       s_Keys[MAX_KEYS];
 static int          s_nKeys = 0;
 
@@ -96,6 +107,12 @@ void Hud_SetMainKeys()
 void Hud_SetMenuName( const char* szName )
 {
     strncpy_s( s_szMenuName, szName ? szName : "", _TRUNCATE );
+}
+
+void Hud_SetProfile( const char* szName, D3DTexture* pPicture )
+{
+    strncpy_s( s_szProfile, szName ? szName : "", _TRUNCATE );
+    s_pProfilePic = pPicture;
 }
 
 void Hud_SetGameInfo( const char* szTitle, const char* szSub )
@@ -153,7 +170,7 @@ HRESULT Hud_Init( D3DDevice* pDevice )
     s_bMono    = SUCCEEDED( Assets_LoadFont( pDevice, "mono", &s_Mono ) );
     s_bDisplay = SUCCEEDED( Assets_LoadFont( pDevice, "display", &s_Display ) );
 
-    static const char* c_szPods[NUM_PODS] = { "pod_a", "pod_b", "pod_x", "pod_y", "pod_rb" };
+    static const char* c_szPods[NUM_PODS] = { "pod_a", "pod_b", "pod_x", "pod_y", "pod_rb", "pod_lb", "pod_lt" };
     for( int i = 0; i < NUM_PODS; i++ )
     {
         if( FAILED( Assets_LoadSpriteInfo( c_szPods[i], &s_PodInfo[i] ) ) ||
@@ -171,6 +188,9 @@ HRESULT Hud_Init( D3DDevice* pDevice )
         FAILED( Assets_LoadTexture( pDevice, "toast_m", &s_pToast[1] ) ) ||
         FAILED( Assets_LoadTexture( pDevice, "toast_r", &s_pToast[2] ) ) )
         s_pToast[0] = NULL;
+    if( FAILED( Assets_LoadSpriteInfo( "profile_frame", &s_ProfileInfo ) ) ||
+        FAILED( Assets_LoadTexture( pDevice, "profile_frame", &s_pProfileFrame ) ) )
+        s_pProfileFrame = NULL;
 
     Hud_SetMainKeys();
     return S_OK;
@@ -456,6 +476,30 @@ void Hud_Render( D3DDevice* pDevice )
         DrawText( pDevice, s_Mono, szClock, R - w, fTopBase, fPx, fPx * 0.25f, ION_DIM, NO_GLOW, 1.0f );
     }
 
+    // Profile badge, centred between them: the gamer picture in its frame, the gamertag
+    // beside it. Hidden while nobody is signed in.
+    if( s_bMono && s_szProfile[0] )
+    {
+        const float fBox = PROFILE_BOX_U * u, fGap = 7.0f * u;
+        float fNameW = TextWidth( s_Mono, s_szProfile, fPx, fPx * 0.25f );
+        float x = floorf( ( L + R - ( fBox + fGap + fNameW ) ) * 0.5f );
+        // Frame first, then the picture over its hole
+        pDevice->SetPixelShaderConstantF( 1, vTrims, 1 );   // sprite
+        if( s_pProfileFrame )
+            DrawBoxSprite( pDevice, s_pProfileFrame, s_ProfileInfo, x, T, s, 0.8f );
+        if( s_pProfilePic )
+        {
+            // The picture keeps its own colours, like box art: TV trims but no theme
+            float vPicTrims[4] = { 0.0f, vTrims[1], vTrims[2], vTrims[3] };
+            float fIn = fBox * PROFILE_PIC_INSET;
+            pDevice->SetPixelShaderConstantF( 1, vPicTrims, 1 );
+            DrawSprite( pDevice, s_pProfilePic, x + fIn, T + fIn, fBox - 2.0f * fIn, fBox - 2.0f * fIn, 1.0f );
+            pDevice->SetPixelShaderConstantF( 1, vTrims, 1 );
+        }
+        DrawText( pDevice, s_Mono, s_szProfile, x + fBox + fGap, T + fBox * 0.5f + fPx * 0.35f,
+                  fPx, fPx * 0.25f, ION, NO_GLOW, 1.0f );
+    }
+
     // Title card above a shelf: Orbitron title (shrunk to fit the safe width), small line under it
     if( s_bTitle && s_szInfoTitle[0] )
     {
@@ -483,13 +527,27 @@ void Hud_Render( D3DDevice* pDevice )
 
     // Bottom bar: menu name on the left, key hints on the right
     const float fBarMid = B - 11.0f * u;
-    // The menu name gives way when a long row of keys needs the room (4:3)
-    float fKeysW = ( s_bMono && s_nRows == 0 ) ? DrawKeys( pDevice, s_Keys, s_nKeys, R, fBarMid, u, s, vTrims, TRUE ) : 0.0f;
+    // A row of keys too wide for the bar drops its hints without a button (the
+    // "\x01 \x02 ..." ones) first. The menu name gives way when the keys need the room (4:3).
+    HudKey Keys[MAX_KEYS];
+    int nKeys = s_nKeys;
+    for( int i = 0; i < nKeys; i++ )
+        Keys[i] = s_Keys[i];
+    float fKeysW = ( s_bMono && s_nRows == 0 ) ? DrawKeys( pDevice, Keys, nKeys, R, fBarMid, u, s, vTrims, TRUE ) : 0.0f;
+    if( fKeysW > R - L )
+    {
+        int n = 0;
+        for( int i = 0; i < nKeys; i++ )
+            if( Keys[i].nPod != HUD_POD_NONE )
+                Keys[n++] = Keys[i];
+        nKeys = n;
+        fKeysW = DrawKeys( pDevice, Keys, nKeys, R, fBarMid, u, s, vTrims, TRUE );
+    }
     if( s_bDisplay && s_szMenuName[0] &&
         L + TextWidth( s_Display, s_szMenuName, fPx, fPx * 0.3f ) + 14.0f * u < R - fKeysW )
         DrawText( pDevice, s_Display, s_szMenuName, L, fBarMid + fPx * 0.35f, fPx, fPx * 0.3f, ION, NO_GLOW, 1.0f );
     if( s_bMono && s_nRows == 0 )
-        DrawKeys( pDevice, s_Keys, s_nKeys, R, fBarMid, u, s, vTrims, FALSE );
+        DrawKeys( pDevice, Keys, nKeys, R, fBarMid, u, s, vTrims, FALSE );
 
     // Details card over a dimmed screen
     if( s_nRows && s_pCard && s_bMono )

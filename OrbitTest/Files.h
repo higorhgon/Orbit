@@ -8,9 +8,17 @@
 //   X             delete (press twice; protected places are refused)
 //   Y             copy to the clipboard
 //   RB            paste the clipboard into this folder (any drive to any drive)
+//   LB            rename (the system keyboard, starting from the current name)
+//   LT            new folder here (the keyboard, starting from "New Folder")
 //   B             up a folder; at a drive's root, back to the menu. Cancels a running job.
+//
+// The keyboard may need a signed-in profile; if it does, the sign-in screen comes up
+// first and the keyboard follows once someone signs in.
 
 #pragma once
+
+// PollInput reports LT pulled as this button bit (unused by the controller's buttons)
+#define PAD_LEFT_TRIGGER 0x0400
 
 HRESULT Files_Init( D3DDevice* pDevice );
 void    Files_Open();

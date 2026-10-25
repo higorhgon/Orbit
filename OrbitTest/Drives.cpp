@@ -576,6 +576,107 @@ BOOL Drives_StartDelete( const char* szPath, char* szWhyNot, int nWhyNot )
     return StartJob( JOB_DELETE, szWhyNot, nWhyNot );
 }
 
+
+//-------------------------------------------------------------------------------------
+// Rename and new folder (quick, so they run straight away rather than as jobs)
+//-------------------------------------------------------------------------------------
+
+// A single file or folder name the drives accept: not empty, not "." or "..", fits a
+// list row, no path characters. The drive itself has the last word (FATX allows 42
+// characters), through ErrorText.
+static const char* BadName( const char* szName )
+{
+    size_t n = strlen( szName );
+    if( n == 0 || strcmp( szName, "." ) == 0 || strcmp( szName, ".." ) == 0 )
+        return "TYPE A NAME";
+    if( n >= sizeof(((DirEntry*)0)->szName) )
+        return "NAME TOO LONG";
+    for( size_t i = 0; i < n; i++ )
+        if( szName[i] < 0x20 || szName[i] > 0x7E || strchr( "\\/:*?\"<>|", szName[i] ) )
+            return "NAME HAS A CHARACTER DRIVES DON'T ALLOW";
+    return NULL;
+}
+
+// The folder holding szPath, with its trailing "\" ("Usb0:\Apps\Orbit" -> "Usb0:\Apps\")
+static void FolderOf( const char* szPath, char* szOut, size_t nOut )
+{
+    strcpy_s( szOut, nOut, szPath );
+    size_t n = strlen( szOut );
+    while( n && szOut[n - 1] == '\\' ) szOut[--n] = 0;
+    szOut[BaseName( szOut ) - szOut] = 0;
+}
+
+BOOL Drives_Rename( const char* szPath, const char* szNewName, char* szNewPath, int nNewPath,
+                    char* szWhyNot, int nWhyNot )
+{
+    const char* szBad = BadName( szNewName );
+    if( szBad )
+    {
+        strcpy_s( szWhyNot, nWhyNot, szBad );
+        return FALSE;
+    }
+    // A copy or delete may be working on it
+    if( JobBusy() )
+    {
+        strcpy_s( szWhyNot, nWhyNot, "STILL WORKING" );
+        return FALSE;
+    }
+    if( Drives_IsProtected( szPath ) )
+    {
+        strcpy_s( szWhyNot, nWhyNot, "PROTECTED" );
+        return FALSE;
+    }
+
+    char szDst[MAX_PATH];
+    FolderOf( szPath, szDst, sizeof(szDst) );
+    strcat_s( szDst, szNewName );
+    if( strcmp( BaseName( szPath ), szNewName ) == 0 )
+    {
+        strcpy_s( szWhyNot, nWhyNot, "SAME NAME" );
+        return FALSE;
+    }
+    // Something else by that name (a change of capitals only is the same item)
+    BOOL bExists;
+    IsDirectory( szDst, &bExists );
+    if( bExists && _stricmp( BaseName( szPath ), szNewName ) != 0 )
+    {
+        strcpy_s( szWhyNot, nWhyNot, "ALREADY THERE" );
+        return FALSE;
+    }
+    if( !MoveFileA( szPath, szDst ) )
+    {
+        strcpy_s( szWhyNot, nWhyNot, ErrorText( GetLastError(), "COULDN'T RENAME IT" ) );
+        return FALSE;
+    }
+    strcpy_s( szNewPath, nNewPath, szDst );
+    return TRUE;
+}
+
+BOOL Drives_NewFolder( const char* szDir, const char* szName, char* szWhyNot, int nWhyNot )
+{
+    const char* szBad = BadName( szName );
+    if( szBad )
+    {
+        strcpy_s( szWhyNot, nWhyNot, szBad );
+        return FALSE;
+    }
+    char szDst[MAX_PATH];
+    JoinPath( szDst, sizeof(szDst), szDir, szName );
+    BOOL bExists;
+    IsDirectory( szDst, &bExists );
+    if( bExists )
+    {
+        strcpy_s( szWhyNot, nWhyNot, "ALREADY THERE" );
+        return FALSE;
+    }
+    if( !CreateDirectoryA( szDst, NULL ) )
+    {
+        strcpy_s( szWhyNot, nWhyNot, ErrorText( GetLastError(), "COULDN'T MAKE THE FOLDER" ) );
+        return FALSE;
+    }
+    return TRUE;
+}
+
 void Drives_CancelJob()
 {
     if( JobBusy() )
