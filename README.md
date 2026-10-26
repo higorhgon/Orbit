@@ -229,6 +229,26 @@ The first time Orbit loads a cover it saves a ready-to-draw copy in `Covers\Cach
 
 With the console online, Orbit downloads the missing covers by itself after every scan, like Aurora does. Official covers are picked first, then the best rated, and they're saved to Orbit's `Covers` folder. The **SCAN NOW** row in SETTINGS shows the progress, and each cover shows up on its shelf as it arrives. No XboxUnity account is needed. *Not tested on every console setup yet.*
 
+Without a network on the console, `Tools/covers_download.py` fetches them for you from XboxUnity (where Aurora gets its covers), already named and sized for Orbit (JPG, or PNG for the few XboxUnity keeps as PNG). It needs Python 3 on a PC, and no XboxUnity account.
+
+1. Copy `library.txt` from Orbit's folder on the console to the PC (or plug in the USB drive Orbit runs from).
+2. Run:
+   ```
+   python Tools/covers_download.py library.txt --out Covers
+   ```
+   You can also pass title IDs instead of the library, e.g. `python Tools/covers_download.py 4D5307E6 4D530004`.
+3. Copy the files in `Covers` into Orbit's `Covers` folder on the console, then **SCAN NOW**.
+
+Official covers are picked first, then the best rated. Covers already in the folder are skipped (`--force` downloads them again).
+
+To choose the covers yourself, add `--pick`:
+
+```
+python Tools/covers_download.py library.txt --out Covers --pick
+```
+
+This opens a page in your browser with every title, its current cover, and a preview of each cover XboxUnity has for it. Covers from other title IDs with the same name are included too, such as a game's Xbox Originals re-release. Each title also has a search box for names XboxUnity spells differently. Click a cover to see it full size, then **Use this cover** to save it. Press **Done** when you're finished. If Orbit runs from a USB drive, `--out` can point straight at its `Covers` folder, e.g. `--out E:\Apps\Orbit\Covers`.
+
 ## Title updates and DLC
 
 Games can be on any drive, but title updates and DLC have to be on the console's internal hard drive (`Hdd1`). The console's content system doesn't see a plain FAT32 USB drive.
