@@ -7,7 +7,8 @@
 //                  path's depth, X removes it (press twice), "+ ADD PATH" picks a folder
 //   LIBRARY        SCAN NOW (rebuilds the shelves), DELETE ALL PATHS (press A twice)
 //   MENU           shows or hides each ring item but SETTINGS (A switches ON / OFF);
-//                  THEME picks the colour (left / right), saved to game:\theme.txt
+//                  THEME picks the colour (left / right), saved to game:\theme.txt;
+//                  SOUND switches the hum and menu sounds ON / OFF (A), saved to game:\sound.txt
 //   DRIVES         REFRESH DRIVES (what's connected, free space, disc in the tray)
 
 #pragma once

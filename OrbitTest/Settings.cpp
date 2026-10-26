@@ -16,12 +16,13 @@
 #include "Scan.h"
 #include "Ring.h"
 #include "Post.h"
+#include "Sound.h"
 #include "Settings.h"
 
 static const float ART_U = 1.5f;
 static const int   MAX_PICK = 512;
 
-enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_MENU, LINE_THEME, LINE_REFRESH };
+enum { LINE_HEADER, LINE_PATH, LINE_ADD, LINE_SCAN, LINE_CLEAR, LINE_MENU, LINE_THEME, LINE_SOUND, LINE_REFRESH };
 struct Line
 {
     int         nKind;
@@ -107,6 +108,7 @@ static int BuildLines( Line* pLines )
     for( int i = 0; i < RING_ITEMS - 1; i++ ) { l.nKind = LINE_MENU; l.nPath = i; pLines[n++] = l; }   // all but SETTINGS
     l.nPath = -1;
     l.nKind = LINE_THEME;   pLines[n++] = l;
+    l.nKind = LINE_SOUND;   pLines[n++] = l;
     l.nKind = LINE_HEADER;  l.szText = "DRIVES"; pLines[n++] = l; l.szText = NULL;
     l.nKind = LINE_REFRESH; pLines[n++] = l;
     return n;
@@ -236,9 +238,11 @@ static void UpdateKeys()
     static const HudKey c_Action[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SELECT" }, { HUD_POD_B, "BACK" } };
     static const HudKey c_Switch[] = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "SHOW / HIDE" }, { HUD_POD_B, "BACK" } };
     static const HudKey c_Theme[]  = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_NONE, "\x01 \x02 COLOUR" }, { HUD_POD_B, "BACK" } };
+    static const HudKey c_Sound[]  = { { HUD_POD_NONE, "\x04 \x05 MOVE" }, { HUD_POD_A, "ON / OFF" }, { HUD_POD_B, "BACK" } };
     if( l.nKind == LINE_PATH )       Hud_SetKeys( c_Path, ARRAYSIZE( c_Path ) );
     else if( l.nKind == LINE_MENU )  Hud_SetKeys( c_Switch, ARRAYSIZE( c_Switch ) );
     else if( l.nKind == LINE_THEME ) Hud_SetKeys( c_Theme, ARRAYSIZE( c_Theme ) );
+    else if( l.nKind == LINE_SOUND ) Hud_SetKeys( c_Sound, ARRAYSIZE( c_Sound ) );
     else                             Hud_SetKeys( c_Action, ARRAYSIZE( c_Action ) );
 }
 
@@ -477,6 +481,11 @@ void Settings_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
             SetTheme( s_nTheme + ( nMoveX ? nMoveX : 1 ), TRUE );
         break;
 
+    case LINE_SOUND:
+        if( wPressed & XINPUT_GAMEPAD_A )
+            Sound_SetEnabled( !Sound_IsEnabled() );
+        break;
+
     case LINE_REFRESH:
         if( wPressed & XINPUT_GAMEPAD_A )
         {
@@ -695,6 +704,16 @@ void Settings_Render( D3DDevice* pDevice )
                 sprintf_s( szValue, "\x01 %s \x02", c_Themes[s_nTheme].szName );
             else
                 strcpy_s( szValue, c_Themes[s_nTheme].szName );
+            break;
+        case LINE_SOUND:
+            szLabel = "SOUND";
+            if( Sound_IsEnabled() )
+                strcpy_s( szValue, "ON" );
+            else
+            {
+                strcpy_s( szValue, "OFF" );
+                pValueColor = &C_WARN;
+            }
             break;
         case LINE_REFRESH:
         {

@@ -25,7 +25,7 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 - **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
 - **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste, delete, rename (**LB**) and make new folders (**LT**). Names are typed on the console's own keyboard; if it asks for a profile, the sign-in screen comes up first. System folders are protected.
 - **Profile:** the signed-in profile's gamer picture and gamertag sit in the middle of the top bar (hidden when nobody is signed in).
-- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items; pick a colour theme.
+- **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items; pick a colour theme; switch the sounds on or off.
 - **Colour themes:** purple (the default), blue, green, orange or red.
 - **Sorting:** items go on the right shelf by what they are, not by which folder they're in.
 
@@ -205,6 +205,12 @@ Open **SETTINGS**, go to **THEME** (under MENU) and press left or right to choos
 The theme colours the background, the orb, the menu, the windows and the text. Box art and the game case colours (black for original Xbox, green for 360, orange for Arcade) stay as they are.
 
 Your choice is saved in `theme.txt`, next to `Orbit.xex`.
+
+## Sound
+
+Open **SETTINGS**, go to **SOUND** (under MENU, below THEME) and press **A** to switch the background hum and the menu sounds between **ON** and **OFF**.
+
+Your choice is saved in `sound.txt`, next to `Orbit.xex`.
 
 ## Box art
 

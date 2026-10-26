@@ -11,6 +11,7 @@
 //   all through a master gain of 0.6
 //
 // The sounds are rendered into PCM buffers at start and played with XAudio2.
+// SETTINGS can switch them all off (saved to game:\sound.txt).
 
 #pragma once
 
@@ -19,3 +20,7 @@ enum { SOUND_MOVE, SOUND_SELECT, SOUND_BACK, NUM_SOUNDS };
 // Starts the audio engine and the hum; quietly does nothing if audio can't start
 void Sound_Init();
 void Sound_Play( int nSound );
+
+// ON / OFF for the hum and the blips; saved straight away
+BOOL Sound_IsEnabled();
+void Sound_SetEnabled( BOOL bEnabled );

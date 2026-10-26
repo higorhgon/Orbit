@@ -13,6 +13,9 @@ static const float MASTER = 0.6f;
 static IXAudio2*               s_pXAudio = NULL;
 static IXAudio2MasteringVoice* s_pMaster = NULL;
 
+static const char* SOUND_FILE = "game:\\sound.txt";
+static BOOL        s_bEnabled = TRUE;
+
 // Blips: a few voices each, so quick repeats overlap instead of cutting off
 static const int    VOICES_PER_SOUND = 3;
 static const UINT32 BLIP_RATE = 48000;
@@ -155,10 +158,45 @@ static void MakeHum( UINT32* pnFade, UINT32* pnLoop )
 
 
 //-------------------------------------------------------------------------------------
+// On / off: sound.txt holds ON or OFF; anything else is on
+//-------------------------------------------------------------------------------------
+static void LoadEnabled()
+{
+    FILE* f = NULL;
+    if( fopen_s( &f, SOUND_FILE, "r" ) != 0 || !f )
+        return;
+    char sz[16] = "";
+    if( fgets( sz, sizeof(sz), f ) )
+    {
+        sz[strcspn( sz, "\r\n" )] = 0;
+        s_bEnabled = _stricmp( sz, "OFF" ) != 0;
+    }
+    fclose( f );
+}
+
+BOOL Sound_IsEnabled() { return s_bEnabled; }
+
+// Off mutes the master voice, so the hum keeps its place in the loop and comes back mid-hum
+void Sound_SetEnabled( BOOL bEnabled )
+{
+    s_bEnabled = bEnabled;
+    if( s_pMaster )
+        s_pMaster->SetVolume( s_bEnabled ? 1.0f : 0.0f );
+    FILE* f = NULL;
+    if( fopen_s( &f, SOUND_FILE, "w" ) == 0 && f )
+    {
+        fprintf( f, "%s\n", s_bEnabled ? "ON" : "OFF" );
+        fclose( f );
+    }
+}
+
+
+//-------------------------------------------------------------------------------------
 // Name: Sound_Init()
 //-------------------------------------------------------------------------------------
 void Sound_Init()
 {
+    LoadEnabled();
     if( FAILED( XAudio2Create( &s_pXAudio, 0, XAUDIO2_DEFAULT_PROCESSOR ) ) )
         return;
     if( FAILED( s_pXAudio->CreateMasteringVoice( &s_pMaster ) ) )
@@ -167,6 +205,8 @@ void Sound_Init()
         s_pXAudio = NULL;
         return;
     }
+    if( !s_bEnabled )
+        s_pMaster->SetVolume( 0.0f );
 
     MakeBlips();
     WAVEFORMATEX Blip = { WAVE_FORMAT_PCM, 1, BLIP_RATE, BLIP_RATE * 2, 2, 16, 0 };
@@ -200,7 +240,7 @@ void Sound_Init()
 //-------------------------------------------------------------------------------------
 void Sound_Play( int nSound )
 {
-    if( !s_pXAudio || nSound < 0 || nSound >= NUM_SOUNDS )
+    if( !s_pXAudio || !s_bEnabled || nSound < 0 || nSound >= NUM_SOUNDS )
         return;
     IXAudio2SourceVoice* pVoice = s_pBlipVoice[nSound][s_nNextVoice[nSound]];
     s_nNextVoice[nSound] = ( s_nNextVoice[nSound] + 1 ) % VOICES_PER_SOUND;
