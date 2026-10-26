@@ -280,6 +280,7 @@
     <ClInclude Include="Scan.h" />
     <ClInclude Include="Settings.h" />
     <ClInclude Include="Sound.h" />
+    <ClInclude Include="Covers.h" />
     <ClInclude Include="Orb.h" />
     <ClInclude Include="Post.h" />
     <ClInclude Include="Profile.h" />
@@ -297,6 +298,7 @@
     <ClCompile Include="Scan.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="Covers.cpp" />
     <ClCompile Include="Orb.cpp" />
     <ClCompile Include="Post.cpp" />
     <ClCompile Include="Profile.cpp" />

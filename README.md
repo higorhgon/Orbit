@@ -225,6 +225,10 @@ Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine |
 
 The first time Orbit loads a cover it saves a ready-to-draw copy in `Covers\Cache\`, so later starts are much quicker. Replacing a cover image is picked up automatically. The `Cache` folder is safe to delete; Orbit rebuilds it on the next start.
 
+### Downloading covers from XboxUnity
+
+With the console online, Orbit downloads the missing covers by itself after every scan, like Aurora does. Official covers are picked first, then the best rated, and they're saved to Orbit's `Covers` folder. The **SCAN NOW** row in SETTINGS shows the progress, and each cover shows up on its shelf as it arrives. No XboxUnity account is needed. *Not tested on every console setup yet.*
+
 ## Title updates and DLC
 
 Games can be on any drive, but title updates and DLC have to be on the console's internal hard drive (`Hdd1`). The console's content system doesn't see a plain FAT32 USB drive.

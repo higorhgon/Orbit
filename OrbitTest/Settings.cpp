@@ -17,6 +17,7 @@
 #include "Ring.h"
 #include "Post.h"
 #include "Sound.h"
+#include "Covers.h"
 #include "Settings.h"
 
 static const float ART_U = 1.5f;
@@ -49,6 +50,7 @@ static int      s_nPickRow  = 0;
 static int      s_nPickTop  = 0;
 
 static BOOL     s_bWasScanning = FALSE;
+static CoversState s_nLastCovers = COVERS_IDLE;
 
 // Colour themes. Most turn Orbit's purples round the colour wheel by fHue. BLUE and
 // RED instead paint every colour in one hue (bFixed), so they come out as a clean
@@ -290,6 +292,21 @@ void Settings_Update( float dt, int nMoveX, int nMoveY, WORD wPressed )
         Toast( sz, 2.2f );
     }
     s_bWasScanning = bScanning;
+
+    // Then the box art download: say how it went
+    CoversState nCovers = Covers_GetState();
+    if( nCovers != s_nLastCovers && ( nCovers == COVERS_DONE || nCovers == COVERS_NO_NETWORK ) )
+    {
+        char sz[64];
+        int nGot;
+        Covers_GetProgress( NULL, NULL, &nGot );
+        if( nCovers == COVERS_DONE )
+            sprintf_s( sz, "COVERS: %d DOWNLOADED", nGot );
+        else
+            strcpy_s( sz, "COVERS: NO NETWORK" );
+        Toast( sz, 2.2f );
+    }
+    s_nLastCovers = nCovers;
 
     if( s_bPicking )
     {
@@ -673,6 +690,14 @@ void Settings_Render( D3DDevice* pDevice )
             szLabel = "SCAN NOW";
             if( Scan_IsRunning() )
                 sprintf_s( szValue, "SCANNING... %d FOUND", Scan_FoundSoFar() );
+            else if( Covers_GetState() == COVERS_CONNECTING )
+                strcpy_s( szValue, "COVERS: CONNECTING..." );
+            else if( Covers_GetState() == COVERS_DOWNLOADING )
+            {
+                int nDone, nTotal, nGot;
+                Covers_GetProgress( &nDone, &nTotal, &nGot );
+                sprintf_s( szValue, "COVERS: %d / %d \x03 %d NEW", nDone, nTotal, nGot );
+            }
             else
             {
                 int n[NUM_SHELVES];

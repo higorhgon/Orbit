@@ -30,6 +30,7 @@
 #include "Sound.h"
 #include "Scan.h"
 #include "Profile.h"
+#include "Covers.h"
 
 //-------------------------------------------------------------------------------------
 // Constants from the prototype
@@ -348,9 +349,12 @@ void UpdateMenu( const InputState& in, float dt )
              ( Files_IsOpen() && ( wPressed & ( XINPUT_GAMEPAD_LEFT_SHOULDER | PAD_LEFT_TRIGGER ) ) ) )
         Sound_Play( SOUND_MOVE );
 
-    // A finished scan refills the shelves
+    // A finished scan refills the shelves, then fetches the box art they're missing
     if( Scan_Poll() )
+    {
         Library_OnLibraryChanged();
+        Covers_Start();
+    }
 
     if( Files_IsOpen() || Settings_IsOpen() )
     {
@@ -429,7 +433,11 @@ void Render()
     // Orb centre's view depth: ring pieces behind it draw before the shell, the rest after
     float fOrbDepth = -XMVectorGetZ( XMVector3Transform( vTarget, matView ) );
 
-    // Shelf covers coming into view get drawn first, in their own render target
+    // A downloaded cover replaces its drawn one (one a frame), then shelf covers coming
+    // into view get drawn, in their own render target
+    char szTitleId[12];
+    if( Covers_PollDone( szTitleId ) )
+        Library_ReloadArt( g_pd3dDevice, szTitleId );
     Library_PrepareCovers( g_pd3dDevice );
 
     // three.js order: background, opaque (nucleus), then transparent far to near

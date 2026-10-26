@@ -631,6 +631,21 @@ void Library_PreloadCovers( D3DDevice* pDevice )
                 ;
 }
 
+void Library_ReloadArt( D3DDevice* pDevice, const char* szTitleId )
+{
+    if( s_bReleasePending )
+        return;   // everything reloads anyway
+    for( int s = 0; s < NUM_SHELVES; s++ )
+        for( int i = 0; i < min( Scan_ItemCount( s ), MAX_SHELF ); i++ )
+            if( s_Art[s][i] == ART_NONE && _stricmp( Scan_GetItem( s, i ).szTitleId, szTitleId ) == 0 )
+            {
+                // The drawn cover stays until the next reload; the art now takes its place
+                LoadArt( pDevice, s, i );
+                if( s == s_nShelf && i == s_nIndex )
+                    s_bHudDirty = TRUE;
+            }
+}
+
 void Library_PrepareCovers( D3DDevice* pDevice )
 {
     if( s_bReleasePending )

@@ -32,6 +32,9 @@ void    Library_PreloadCovers( D3DDevice* pDevice );
 // Items whose covers are still to load (after a rescan replaced them); *pnTotal = all items
 int     Library_CoversRemaining( int* pnTotal );
 
+// Loads the box art just saved for szTitleId (Covers.h) into the items still without any
+void    Library_ReloadArt( D3DDevice* pDevice, const char* szTitleId );
+
 // Fills in covers still missing (after a rescan), a couple per frame, the open shelf's
 // nearest first. Call before the frame's scene starts (it uses its own render target).
 void    Library_PrepareCovers( D3DDevice* pDevice );
