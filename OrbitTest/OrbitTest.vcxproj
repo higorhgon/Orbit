@@ -241,6 +241,9 @@
       <Command>call "$(ProjectDir)Shaders\BuildShaders.cmd"</Command>
       <Message>Compiling shaders</Message>
     </PreBuildEvent>
+    <ImageXex>
+      <TitleID>0xC0DE0B17</TitleID>
+    </ImageXex>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
