@@ -22,7 +22,7 @@ If something doesn't work on your setup, please [open an issue](../../issues).
 - **Main menu:** a ring of six items: XBOX, XBOX 360, ARCADE, APPS, FILES, SETTINGS. Items you don't use can be hidden (see [Hiding menu items](#hiding-menu-items)).
 - **Shelves:** 3D game cases (black for original Xbox, green for 360, orange for Arcade) with your box art. Games without art get a cover drawn for them.
   - **A** launch, **X** back cover, **Y** details (title, version, size, delete).
-- **Launching:** original Xbox games, installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
+- **Launching:** original Xbox games (folders with a `default.xbe`, or Games on Demand packages), installed 360 games (Games on Demand packages), Arcade games, apps, and any `.xex` / `.xbe` file from FILES.
 - **FILES:** browse `Hdd1`, `Usb0`–`Usb2` and `Dvd`, then copy, paste, delete, rename (**LB**) and make new folders (**LT**). Names are typed on the console's own keyboard; if it asks for a profile, the sign-in screen comes up first. System folders are protected.
 - **Profile:** the signed-in profile's gamer picture and gamertag sit in the middle of the top bar (hidden when nobody is signed in).
 - **SETTINGS:** choose the folders Orbit scans, how deep it looks, and rescan; show or hide menu items; pick a colour theme; switch the sounds on or off.
@@ -162,7 +162,7 @@ Depth is how many folder levels Orbit looks down from the path. It stops going d
 | Path | Depth | What it's for |
 |---|---|---|
 | `Hdd1:\Apps` | **2** | Homebrew apps, one folder each, e.g. `Hdd1:\Apps\Simple 360 NAND Flasher\default.xex`. Fills the APPS shelf. The folder must be named **Apps**. |
-| `Hdd1:\Content\0000000000000000` | **3** | Installed content: GOD packages, Arcade games and app packages. Fills the XBOX 360, ARCADE and APPS shelves. |
+| `Hdd1:\Content\0000000000000000` | **3** | Installed content: GOD packages (Xbox 360 and original Xbox), Arcade games and app packages. Fills the XBOX, XBOX 360, ARCADE and APPS shelves. |
 | `Hdd1:\OG_Xbox` | **2** | Original Xbox games, one folder each with a `default.xbe`, e.g. `Hdd1:\OG_Xbox\Halo\default.xbe`. Fills the XBOX shelf. The folder name is up to you, and it's the name the game shows on the shelf (rename it in FILES, then **SCAN NOW**). |
 | `Hdd1:\Games` | **2** | Xbox 360 game rips, e.g. `Hdd1:\Games\<Game>\default.xex`. Fills the XBOX 360 shelf. *Not tested yet.* |
 
@@ -181,6 +181,7 @@ The same layout moves to `Usb0`, except original Xbox games, which stay on the i
 You can mix both: add a path for each place you keep things.
 
 - **GOD vs rips:** a Games on Demand game is a single installed package that lives under `Content\0000000000000000\<TitleID>\00007000`. A rip is a plain folder of the disc's files with a `default.xex`. Both end up on the XBOX 360 shelf; they just need different paths and depths.
+- **Original Xbox as GOD:** an original Xbox game converted to Games on Demand (for example with Iso2God, platform *Xbox Original*) lives under `Content\0000000000000000\<TitleID>\00005000` and goes on the XBOX shelf. The same `Content\0000000000000000` path at depth **3** finds it. *Not tested on a console yet.*
 - Anything with a `.xex` inside a folder named **Apps** goes on the APPS shelf. Elsewhere, a `default.xex` counts as an Xbox 360 game.
 - Games installed under a profile live in `Content\<profile ID>` instead of `Content\0000000000000000`. To include those too, add `Hdd1:\Content` (or `Usb0:\Content`) at depth **4**.
 - Removing a path: select it and press **X** twice. **DELETE ALL PATHS** clears the whole list (press **A** twice). Run **SCAN NOW** afterwards to update the shelves.

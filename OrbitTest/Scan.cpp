@@ -246,6 +246,7 @@ static void AddPackage( const char* szFile, ULONGLONG qwFileSize )
     int nShelf;
     switch( BE32( Head + 0x344 ) )
     {
+    case 0x00005000: nShelf = SHELF_XBOX;   break;   // original Xbox games on demand
     case 0x00007000: nShelf = SHELF_360;    break;   // games on demand
     case 0x000D0000: nShelf = SHELF_ARCADE; break;   // arcade
     case 0x00080000: nShelf = SHELF_APPS;   break;   // demos / homebrew packages
@@ -316,7 +317,8 @@ static void Walk( const char* szDir, int nLeft )
     // Packages sit in a content type folder (..\<title ID>\<type>\<file>)
     const char* szHere = BaseName( szDir );
     BOOL bTypeFolder = strlen( szHere ) == 8 &&
-                       ( _stricmp( szHere, "00007000" ) == 0 || _stricmp( szHere, "000D0000" ) == 0 || _stricmp( szHere, "00080000" ) == 0 );
+                       ( _stricmp( szHere, "00005000" ) == 0 || _stricmp( szHere, "00007000" ) == 0 ||
+                         _stricmp( szHere, "000D0000" ) == 0 || _stricmp( szHere, "00080000" ) == 0 );
 
     hFind = FindFirstFileA( szFind, &fd );
     if( hFind == INVALID_HANDLE_VALUE )

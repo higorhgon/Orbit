@@ -8,6 +8,7 @@
 //   folder with default.xbe                    -> XBOX      (title / version from the XBE)
 //   folder with default.xex                    -> APPS if under an Apps folder, else XBOX 360
 //   folder under Apps with another .xex        -> APPS      (e.g. Aurora\Aurora.xex)
+//   package in a ...\00005000\ folder (GOD)    -> XBOX      (an original Xbox game, e.g. from Iso2God)
 //   package in a ...\00007000\ folder (GOD)    -> XBOX 360  (name / version from its header)
 //   package in a ...\000D0000\ folder          -> ARCADE
 //   package in a ...\00080000\ folder          -> APPS

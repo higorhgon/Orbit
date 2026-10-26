@@ -869,7 +869,8 @@ void Library_Update( float dt, int nMove, WORD wPressed, float* pfPulse )
                 *pfPulse = 1.0f;
                 const ScanItem& it = Scan_GetItem( s_nShelf, s_nIndex );
                 // A loose .xex / .xbe launches as it is; an installed game (a Games on
-                // Demand or Arcade package) has its default.xex launched from inside it
+                // Demand or Arcade package) has its default.xex launched from inside it,
+                // or its default.xbe for an original Xbox one
                 size_t n = strlen( it.szLaunch );
                 BOOL bFile = n > 4 && ( _stricmp( it.szLaunch + n - 4, ".xex" ) == 0 || _stricmp( it.szLaunch + n - 4, ".xbe" ) == 0 );
                 char szToast[80];
@@ -890,7 +891,8 @@ void Library_Update( float dt, int nMove, WORD wPressed, float* pfPulse )
                     DWORD dwErr = (DWORD)XamContentOpenFile( 0xFE, "orbitpkg", szMount, 0x4000043, 0, 0, NULL );
                     if( dwErr == 0 )
                     {
-                        XLaunchNewImage( "orbitpkg:\\default.xex", 0 );   // only returns if it failed
+                        const char* szImage = GetFileAttributesA( "orbitpkg:\\default.xbe" ) != (DWORD)-1 ? "orbitpkg:\\default.xbe" : "orbitpkg:\\default.xex";
+                        XLaunchNewImage( szImage, 0 );   // only returns if it failed
                         sprintf_s( szToast, "COULDN'T LAUNCH THAT (LAUNCH %08X)", GetLastError() );
                         XamContentClose( "\\??\\orbitpkg", NULL );
                     }
