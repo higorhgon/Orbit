@@ -221,6 +221,14 @@ Box art is for original Xbox games, Xbox 360 games and apps (Arcade games use th
 2. Put covers in it named by title ID, for example `4D5307E6.jpg` for Halo 3. A game's title ID is shown in its content folder name (`Content\0000000000000000\<TitleID>`) or on xboxunity.net.
 3. Run **SCAN NOW** in SETTINGS, or restart Orbit, to load them.
 
+### A cover for one game only
+
+Mods and hacks often keep the title ID of the game they're built on (Anime Hero has the same one as Guitar Hero III), so a cover named by title ID shows up on both. To give one game its own cover, name the image after the game's folder instead, for example `Covers\Anime Hero (GH3) (Xbox 360).jpg` for `Games\X360\Anime Hero (GH3) (Xbox 360)\default.xex`. Orbit checks for a cover named after the folder first, then for one named by title ID.
+
+- For an extracted game or an app it's the folder holding the `.xex` / `.xbe`. For a Games on Demand package (`<name>\<TitleID>\00007000\...`) it's the `<name>` folder.
+- The Xbox 360 drive keeps file names to 42 characters, so a folder name of 39 characters or more leaves no room for `.jpg`. Shorten the folder in that case.
+- If you rename the game's folder, rename its cover too.
+
 Orbit expects full wrap-around scans of 900×600 pixels, laid out back | spine | front, like the ones on [xboxunity.net](https://xboxunity.net). JPG and PNG both work.
 
 The first time Orbit loads a cover it saves a ready-to-draw copy in `Covers\Cache\`, so later starts are much quicker. Replacing a cover image is picked up automatically. The `Cache` folder is safe to delete; Orbit rebuilds it on the next start.

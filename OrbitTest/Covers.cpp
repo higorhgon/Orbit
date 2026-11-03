@@ -17,7 +17,7 @@
 static const char* UNITY_HOST = "xboxunity.net";
 static const char* COVERS_DIR = "game:\\Covers\\";
 // Folders a cover may already be in (as Library.cpp looks for them)
-static const char* c_szHaveDirs[] = { "game:\\Covers\\", "Usb0:\\Orbit\\Covers\\" };
+static const char* c_szHaveDirs[] = { "game:\\Covers\\" };
 
 static const int   MAX_TITLES  = 1024;
 static const DWORD BUF_SIZE    = 4 * 1024 * 1024;   // a box scan is well under 2 MB
@@ -291,8 +291,9 @@ void Covers_Start()
 
     // Each title ID once, only those with no cover yet
     s_nIds = 0;
+    // (not ARCADE: its tiles show the package's own icon, never the Covers folder)
     for( int sh = 0; sh < NUM_SHELVES; sh++ )
-        for( int i = 0; i < Scan_ItemCount( sh ) && s_nIds < MAX_TITLES; i++ )
+        for( int i = 0; sh != SHELF_ARCADE && i < Scan_ItemCount( sh ) && s_nIds < MAX_TITLES; i++ )
         {
             const char* szId = Scan_GetItem( sh, i ).szTitleId;
             if( !szId[0] || HaveCover( szId ) )

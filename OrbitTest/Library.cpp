@@ -18,7 +18,9 @@
 //   cover level   : 1 front / 0.55 others (the side cases are dimmer)
 //
 // The items come from the scan (Scan.h). Box art comes from the Covers folder next to
-// Orbit.xex (game:\Covers\<title ID>.jpg or .png). A full box scan (back | spine | front side by side, XboxUnity's
+// Orbit.xex: game:\Covers\<game folder name>.jpg or .png first, so a mod sharing its
+// title ID with the game it's built on (Anime Hero and Guitar Hero III) can have its own,
+// then game:\Covers\<title ID>.jpg or .png. A full box scan (back | spine | front side by side, XboxUnity's
 // 900 x 600 layout) wraps the whole case and gives it a back cover; a portrait image
 // is just the front. Decoding an image is slow, so the first load saves the result in
 // a Cache folder beside it and later boots copy that in instead. ARCADE tiles are
@@ -529,6 +531,31 @@ static void SaveCachedArt( const char* szDir, const char* szCache, const ArtStam
     delete[] pData;
 }
 
+// The name of the folder holding an item, for its own cover (Covers\<name>.jpg): the
+// game's folder for a loose .xex / .xbe, or for a package (<name>\<title ID>\00007000\..)
+// the folder above its title ID folder. FALSE when there's none (a package in the root).
+static BOOL GameFolderName( const ScanItem& it, char* szName, size_t cchName )
+{
+    char szDir[MAX_PATH];
+    strcpy_s( szDir, it.szDelete );
+    size_t n = strlen( it.szLaunch );
+    BOOL bFile = n > 4 && ( _stricmp( it.szLaunch + n - 4, ".xex" ) == 0 || _stricmp( it.szLaunch + n - 4, ".xbe" ) == 0 );
+    for( int nUp = bFile ? 0 : 2; ; nUp-- )
+    {
+        char* pSlash = strrchr( szDir, '\\' );
+        if( !pSlash || !pSlash[1] )
+            return FALSE;   // reached the drive ("Hdd1:")
+        // Packages: drop the type folder (00007000), then the title ID folder if it's one
+        if( nUp == 2 || ( nUp == 1 && _stricmp( pSlash + 1, it.szTitleId ) == 0 ) )
+        {
+            *pSlash = 0;
+            continue;
+        }
+        strcpy_s( szName, cchName, pSlash + 1 );
+        return TRUE;
+    }
+}
+
 // Box art for an item from the covers folder, compressed to DXT1 with mips (from the
 // cache when it's there). A wide image (a box scan) wraps the case; a tall one is the front.
 // ARCADE items only show their package's icon (Covers\Icons, saved by the scan), kept
@@ -552,39 +579,47 @@ static void LoadArt( D3DDevice* pDevice, int nShelf, int i )
         }
         return;
     }
-    static const char* c_szExt[] = { "jpg", "png" };
-    for( int d = 0; d < ARRAYSIZE( c_szCoverDirs ); d++ )
-        for( int e = 0; e < ARRAYSIZE( c_szExt ); e++ )
-        {
-            char szPath[MAX_PATH];
-            sprintf_s( szPath, "%s%s.%s", c_szCoverDirs[d], it.szTitleId, c_szExt[e] );
-            WIN32_FILE_ATTRIBUTE_DATA Attr;
-            if( !GetFileAttributesExA( szPath, GetFileExInfoStandard, &Attr ) )
-                continue;
-            const ArtStamp Stamp = { Attr.nFileSizeLow, Attr.ftLastWriteTime.dwLowDateTime,
-                                     Attr.ftLastWriteTime.dwHighDateTime };
-            char szCache[MAX_PATH];
-            sprintf_s( szCache, "%sCache\\%s.dxt", c_szCoverDirs[d], it.szTitleId );
+    // The game's own cover (by folder name) wins over the one for its title ID
+    char szNames[2][MAX_PATH];
+    int nNames = 0;
+    if( GameFolderName( it, szNames[0], sizeof(szNames[0]) ) && _stricmp( szNames[0], it.szTitleId ) != 0 )
+        nNames++;
+    strcpy_s( szNames[nNames++], it.szTitleId );
 
-            D3DTexture* pTex = LoadCachedArt( pDevice, szCache, Stamp );
-            if( !pTex )
+    static const char* c_szExt[] = { "jpg", "png" };
+    for( int k = 0; k < nNames; k++ )
+        for( int d = 0; d < ARRAYSIZE( c_szCoverDirs ); d++ )
+            for( int e = 0; e < ARRAYSIZE( c_szExt ); e++ )
             {
-                // Levels down to the packed tail, so the result can be cached
-                D3DXIMAGE_INFO Info;
-                UINT nLevels = D3DX_DEFAULT;
-                if( SUCCEEDED( D3DXGetImageInfoFromFileA( szPath, &Info ) ) && ArtLevels( Info.Width, Info.Height ) > 0 )
-                    nLevels = ArtLevels( Info.Width, Info.Height );
-                if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, nLevels,
-                                                          0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
+                char szPath[MAX_PATH];
+                sprintf_s( szPath, "%s%s.%s", c_szCoverDirs[d], szNames[k], c_szExt[e] );
+                WIN32_FILE_ATTRIBUTE_DATA Attr;
+                if( !GetFileAttributesExA( szPath, GetFileExInfoStandard, &Attr ) )
                     continue;
-                SaveCachedArt( c_szCoverDirs[d], szCache, Stamp, pTex );
+                const ArtStamp Stamp = { Attr.nFileSizeLow, Attr.ftLastWriteTime.dwLowDateTime,
+                                         Attr.ftLastWriteTime.dwHighDateTime };
+                char szCache[MAX_PATH];
+                sprintf_s( szCache, "%sCache\\%s.dxt", c_szCoverDirs[d], szNames[k] );
+
+                D3DTexture* pTex = LoadCachedArt( pDevice, szCache, Stamp );
+                if( !pTex )
+                {
+                    // Levels down to the packed tail, so the result can be cached
+                    D3DXIMAGE_INFO Info;
+                    UINT nLevels = D3DX_DEFAULT;
+                    if( SUCCEEDED( D3DXGetImageInfoFromFileA( szPath, &Info ) ) && ArtLevels( Info.Width, Info.Height ) > 0 )
+                        nLevels = ArtLevels( Info.Width, Info.Height );
+                    if( FAILED( D3DXCreateTextureFromFileExA( pDevice, szPath, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, nLevels,
+                                                              0, D3DFMT_DXT1, D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &pTex ) ) )
+                        continue;
+                    SaveCachedArt( c_szCoverDirs[d], szCache, Stamp, pTex );
+                }
+                D3DSURFACE_DESC Desc;
+                pTex->GetLevelDesc( 0, &Desc );
+                s_pArt[nShelf][i] = pTex;
+                s_Art[nShelf][i] = ( Desc.Width > Desc.Height * 1.2f ) ? ART_WRAP : ART_FRONT;
+                return;
             }
-            D3DSURFACE_DESC Desc;
-            pTex->GetLevelDesc( 0, &Desc );
-            s_pArt[nShelf][i] = pTex;
-            s_Art[nShelf][i] = ( Desc.Width > Desc.Height * 1.2f ) ? ART_WRAP : ART_FRONT;
-            return;
-        }
 }
 
 // Whether X can turn this item round: boxed shelves only (a box scan, or a drawn back)

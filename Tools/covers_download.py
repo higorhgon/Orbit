@@ -48,13 +48,14 @@ def fetch( url, timeout=30 ):
 
 
 # library.txt: shelf, title, version, size, launch, delete, drive, title ID (tab
-# separated, "-" when unknown). Returns [(title ID, name)]
+# separated, "-" when unknown). Returns [(title ID, name)]. Arcade (shelf 2) is left
+# out: Orbit shows each package's own icon there, not the Covers folder.
 def read_library( path ):
     titles = []
     with open( path, encoding="latin-1" ) as f:
         for line in f:
             fields = line.rstrip( "\r\n" ).split( "\t" )
-            if len( fields ) >= 8 and TITLE_ID.match( fields[7] ):
+            if len( fields ) >= 8 and fields[0] != "2" and TITLE_ID.match( fields[7] ):
                 titles.append( ( fields[7].upper(), fields[1] ) )
     return titles
 
