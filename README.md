@@ -281,6 +281,16 @@ MSBuild OrbitTest.sln /p:Configuration=Release "/p:Platform=Xbox 360"
 
 The shaders in `OrbitTest\Shaders` compile automatically before each build (`BuildShaders.cmd`).
 
+### Building from Linux with WinBoat
+
+If Visual Studio 2010 and the SDK are installed in a [WinBoat](https://www.winboat.app) Windows VM, `Tools/build.sh` builds from Linux without opening the Windows desktop:
+
+```
+Tools/build.sh            # Release (or: Tools/build.sh Debug)
+```
+
+It opens `Tools/build.cmd` in Windows over RDP. That script copies the project to `C:\Projects\Orbit`, runs MSBuild there and sends `Orbit.xex` and `build.log` back to `Builds/`. The project has to be inside your Linux home folder, which WinBoat shares with Windows as `\\host.lan\Data`. It needs `xfreerdp3`, and the WinBoat container must be running. The RDP login and port are read from the container.
+
 The menu art in `Media\` is generated from `Tools\bake.html`. Run `node Tools/bake.js` to bake it; this uses Google Chrome or Microsoft Edge (whichever is installed) in headless mode. `orbit-prototype.html` is the browser prototype the console version was built from.
 
 ## Credits
